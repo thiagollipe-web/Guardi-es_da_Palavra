@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#13252e">
 <title>Léxico — Guardiões da Palavra</title>
+<meta name="description" content="RPG educativo de Língua Portuguesa para o Ensino Fundamental II.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Léxico">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
+<link rel="manifest" href="./manifest.webmanifest">
 <style>
   /* Interface nativa para os formulários; todas as ilustrações são Canvas. */
   :root { color-scheme:dark; --paper:#f5edd6; --muted:#afc4c2; --ink:#13252e; --line:#35545e; --gold:#f4cd75; --teal:#6bb9ad; }
@@ -112,6 +120,152 @@
   .inventory-item canvas { width:40px; height:40px; background:transparent; }
   .inventory-item strong { color:var(--paper); }
   .inventory-item p { font-size:13px; color:var(--muted); margin:4px 0 8px; }
+  .inventory-item button { font-size:13px; padding:8px 10px; }
+  .seal-list { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:10px 0; }
+  .seal-list span { padding:8px; font-size:13px; border:1px solid var(--line); border-radius:6px; color:var(--muted); }
+  .seal-list span[data-earned="true"] { color:var(--gold); border-color:#b38747; }
+  #inventorySaveNote { color:var(--muted); font-size:13px; }
+  @media (max-width:700px) {
+    .onboarding { display:flex; flex-direction:column; gap:14px; align-items:stretch; padding:8px 6px 18px; }
+    .opening-brand { margin-bottom:10px; }
+    .opening-brand h1 { font-size:39px; }
+    .opening-caption { display:none; }
+    .opening-art { max-height:190px; object-fit:contain; }
+    .start-form { padding:16px; gap:12px; }
+    .start-form h2 { font-size:21px; }
+  }
+  @media (max-width:430px) {
+    .brand strong { font-size:16px; }
+    .toolbar { gap:4px; }
+    .toolbar button { font-size:12px; padding:6px 7px; min-height:36px; }
+    .dpad { grid-template:repeat(3,52px) / repeat(3,52px); }
+    .ab button { width:68px; height:68px; }
+    .status-line { font-size:10px; }
+  }
+  @media (orientation:landscape) and (max-height:600px) {
+    #app { padding-top:3px; }
+    header { margin-bottom:2px; }
+    .brand strong { font-size:16px; }
+    .toolbar button { padding:3px 8px; min-height:30px; font-size:12px; }
+    .status-line { font-size:10px; padding-bottom:2px; }
+    .below { display:none; }
+    .onboarding { gap:18px; padding:8px; }
+    .opening-brand h1 { font-size:36px; }
+    .opening-caption { display:none; }
+    .start-form { padding:12px; gap:9px; }
+    .avatar-card { min-height:58px; }
+  }
+  @media (orientation:landscape) and (max-width:760px) {
+    #app[data-controls="show"][data-dock="side"] .game-layout { grid-template-columns:148px minmax(0,1fr) 80px; }
+    #app[data-dock="side"] .ab { flex-direction:column-reverse; gap:12px; }
+    #app[data-dock="side"] .control-note { display:none; }
+  }
+</style>
+</head>
+<body>
+<main id="app" data-screen="welcome" data-interface="desktop" data-controls="hide" data-dock="side">
+  <header>
+    <div class="brand"><strong>LÉXICO</strong></div>
+    <div class="toolbar">
+      <button id="inventoryButton" type="button" title="Inventário (I)">Bolsa</button>
+      <button id="fullButton" type="button" title="Tela cheia (F)">⛶ Tela cheia</button>
+      <button id="settingsButton" type="button" title="Opções (O)">Opções</button>
+    </div>
+  </header>
+  <div class="status-line"><span id="playerBadge"></span><span id="saveStatus" role="status">Salvamento automático</span></div>
+  <section id="onboarding" class="onboarding" aria-labelledby="openingTitle">
+    <div class="opening-scene">
+      <div class="opening-brand"><h1 id="openingTitle">LÉXICO</h1><p>GUARDIÕES DA PALAVRA</p></div>
+      <canvas id="openingArt" class="opening-art" width="960" height="440" aria-label="Um livro luminoso abre os caminhos de uma vila entre bosques, ruínas e histórias."></canvas>
+      <p class="opening-caption">O Ruído embaralhou as histórias. Explore quatro regiões, descubra pistas e devolva as palavras à vila.</p>
+    </div>
+    <form id="startForm" class="start-form">
+      <h2>Sua aventura começa aqui</h2>
+      <label class="field" for="playerName">Nome do personagem
+        <input id="playerName" type="text" maxlength="18" autocomplete="nickname" placeholder="Como você quer se chamar?" value="" enterkeyhint="done">
+      </label>
+      <fieldset><legend>Escolha seu personagem</legend>
+        <div class="avatar-cards">
+          <button id="chooseBoy" class="avatar-card" type="button" aria-pressed="true"><canvas id="boyPreview" width="64" height="80" aria-hidden="true"></canvas><span>Menino</span></button>
+          <button id="chooseGirl" class="avatar-card" type="button" aria-pressed="false"><canvas id="girlPreview" width="64" height="80" aria-hidden="true"></canvas><span>Menina</span></button>
+        </div>
+        <select id="avatar" hidden aria-label="Personagem escolhido"><option value="boy">Menino</option><option value="girl">Menina</option></select>
+      </fieldset>
+      <label class="field" for="grade">Ano escolar
+        <select id="grade" aria-label="Ano escolar da nova aventura"><option value="6">6º ano</option><option value="7">7º ano</option><option value="8">8º ano</option><option value="9">9º ano</option></select>
+      </label>
+      <button id="startButton" class="start-primary" type="submit">Começar aventura →</button>
+      <button id="resumeButton" class="resume-button" type="button" hidden>Continuar aventura</button>
+      <p id="resumeDetails" hidden></p>
+      <p class="opening-save-note">Seu progresso é salvo automaticamente neste navegador.</p>
+    </form>
+  </section>
+  <div class="game-layout">
+    <div class="screen-stage" id="screenStage">
+    <div class="screen-shell">
+      <canvas id="game" width="640" height="480" tabindex="0"
+        aria-label="Léxico, RPG de Língua Portuguesa. Use setas para explorar, Enter para confirmar e X para voltar. F alterna tela cheia; O abre opções."
+        aria-describedby="accessibleState">Seu navegador precisa oferecer suporte a Canvas 2D.</canvas>
+    </div>
+    </div>
+    <div class="pad-side">
+      <div class="dpad" role="group" aria-label="Controle direcional">
+        <button type="button" data-input="up" aria-label="Cima">▲</button>
+        <button type="button" data-input="left" aria-label="Esquerda">◀</button>
+        <span class="dpad-center" aria-hidden="true"></span>
+        <button type="button" data-input="right" aria-label="Direita">▶</button>
+        <button type="button" data-input="down" aria-label="Baixo">▼</button>
+      </div>
+    </div>
+    <div class="action-side">
+      <div class="ab" role="group" aria-label="Botões de ação">
+        <button type="button" data-input="B" aria-label="B: voltar ou abrir caderno">B</button>
+        <button type="button" data-input="A" aria-label="A: interagir ou confirmar">A</button>
+      </div>
+      <p class="control-note">A · confirmar / conversar<br>B · voltar / caderno</p>
+    </div>
+  </div>
+  <p id="notice" role="status"></p>
+  <p class="below">WASD ou setas · Enter / Espaço = A · Esc = B · Toque nas opções para selecionar</p>
+  <p id="accessibleState" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+  <section id="accessibleChoices" class="sr-only" aria-label="Opções da tela atual"></section>
+<dialog id="helpDialog" aria-labelledby="helpTitle">
+  <h2 id="helpTitle">Um mundo para ler e explorar</h2>
+  <p>O Ruído embaralhou as palavras de Léxico. Conquiste os quatro selos e entre no
+  Arquivo Central para recuperar as histórias da vila.</p>
+  <ul>
+    <li>Escreva seu nome, escolha o ano escolar e o personagem e aperte <strong>A / Enter</strong> para iniciar. Na abertura,
+    <strong>B / Esc</strong> continua a aventura salva, quando houver uma.</li>
+    <li>Caminhe com <strong>WASD, setas ou D-Pad</strong>. O personagem termina um
+    quadrado antes de começar o próximo. A grama alta pode iniciar batalhas.</li>
+    <li>No computador, <strong>Enter, Espaço ou Z</strong> confirma e <strong>X ou B</strong>
+    volta sem sair da tela cheia. <strong>F</strong> alterna a tela cheia,
+    <strong>O</strong> abre as opções, <strong>H</strong> abre a ajuda e
+    <strong>M</strong> liga ou desliga o som.</li>
+    <li>Use <strong>Opções</strong> para escolher computador ou celular e mostrar ou
+    ocultar o D-Pad. A bolsa também pode ser aberta com <strong>I</strong>; <strong>J</strong> mostra as missões. No mouse, um clique seleciona e um <strong>duplo clique</strong>
+    confirma uma alternativa ou ação do menu. Essa confirmação pode ser desativada.</li>
+    <li>Aproxime-se de pessoas, placas e guardiões e aperte <strong>A</strong>.
+    São <strong>12 missões em quatro capítulos</strong>: recupere e entregue páginas, supere a prova e conquiste o selo de cada região. Cada selo libera o capítulo seguinte. Os inimigos ganham HP e causam mais dano com o avanço. <strong>B</strong> abre o mapa; <strong>J</strong> ou a bolsa abre as missões.
+    As clareiras de estudo oferecem explicações e um dicionário na primeira visita. O alvo dourado indica o objetivo atual.</li>
+    <li><strong>ANALISAR:</strong> resolva uma questão. Cada acerto tira 30 HP do inimigo;
+    cada erro tira HP do aprendiz. O comentário explica a resposta.</li>
+    <li><strong>ESTUDAR:</strong> recupera 35 HP, mas o monstro contra-ataca.
+    Há três estudos por batalha. A bibliotecária da vila recupera todo o HP.</li>
+    <li><strong>DICIONÁRIO:</strong> consome um item e elimina duas alternativas incorretas
+    da próxima questão. Nessa questão, B abre uma dica de raciocínio.</li>
+    <li><strong>FUGIR:</strong> volta ao mapa sem prêmio. Guardiões também podem ser
+    abandonados e enfrentados novamente.</li>
+    <li>As questões e os comentários <strong>não têm limite de tempo</strong>.
+    Depois de ler o comentário, avance com A. O progresso é salvo após passos e batalhas,
+    quando o navegador permite armazenamento local.</li>
+  </ul>
+  <h3>Para usar na aula</h3>
+  <p>O banco contém 128 questões autorais, 32 por ano, com oito itens de cada eixo:
+  Morfologia, Sintaxe, Ortografia e Literatura Brasileira. Há trechos curtos de
+  Gonçalves Dias e Machado de Assis, ambos em domínio público; os demais microtextos
+  são originais. Os desafios selecionam somente questões do ano escolhido.</p>
+  <table--muted); margin:4px 0 8px; }
   .inventory-item button { font-size:13px; padding:8px 10px; }
   .seal-list { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:10px 0; }
   .seal-list span { padding:8px; font-size:13px; border:1px solid var(--line); border-radius:6px; color:var(--muted); }
