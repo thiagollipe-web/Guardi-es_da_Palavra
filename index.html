@@ -125,6 +125,27 @@
   .seal-list span { padding:8px; font-size:13px; border:1px solid var(--line); border-radius:6px; color:var(--muted); }
   .seal-list span[data-earned="true"] { color:var(--gold); border-color:#b38747; }
   #inventorySaveNote { color:var(--muted); font-size:13px; }
+  .ranking-intro { color:var(--muted); margin:0 0 14px; }
+  .ranking-toolbar { display:flex; gap:8px; align-items:end; flex-wrap:wrap; margin:14px 0; }
+  .ranking-toolbar label { display:grid; gap:5px; flex:1 1 180px; font-size:13px; }
+  .ranking-toolbar button { padding:9px 12px; }
+  .ranking-status { min-height:22px; margin:8px 0 12px; color:var(--teal); font-size:13px; }
+  .ranking-status[data-kind="warn"] { color:var(--gold); }
+  .ranking-status[data-kind="error"] { color:var(--red); }
+  .ranking-table-wrap { overflow:auto; border:1px solid var(--line); border-radius:10px; background:#0e2029; }
+  .ranking-table { width:100%; border-collapse:collapse; min-width:500px; }
+  .ranking-table th,.ranking-table td { padding:9px 10px; border-bottom:1px solid #25414a; text-align:left; }
+  .ranking-table th { color:var(--gold); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  .ranking-table td { font-size:14px; }
+  .ranking-table tr:last-child td { border-bottom:0; }
+  .ranking-pos { width:48px; text-align:center !important; color:var(--gold); font-weight:700; }
+  .ranking-score { white-space:nowrap; font-weight:700; color:var(--paper); }
+  .ranking-note { color:var(--muted); font-size:12px; margin:12px 0 0; }
+  .ranking-best { margin:10px 0 0; color:var(--paper); font-weight:600; }
+  @media (max-width:520px) {
+    .ranking-table-wrap { margin:0 -2px; }
+    .ranking-table th,.ranking-table td { padding:8px 7px; }
+  }
   @media (max-width:700px) {
     .onboarding { display:flex; flex-direction:column; gap:14px; align-items:stretch; padding:8px 6px 18px; }
     .opening-brand { margin-bottom:10px; }
@@ -168,6 +189,7 @@
     <div class="brand"><strong>LÉXICO</strong></div>
     <div class="toolbar">
       <button id="inventoryButton" type="button" title="Inventário (I)">Bolsa</button>
+      <button id="rankingButton" type="button" title="Classificação online">Classificação</button>
       <button id="fullButton" type="button" title="Tela cheia (F)">⛶ Tela cheia</button>
       <button id="settingsButton" type="button" title="Opções (O)">Opções</button>
     </div>
@@ -325,6 +347,7 @@
       <tr><th scope="row">Opções / ajuda</th><td>O / H</td></tr>
       <tr><th scope="row">Som</th><td>M</td></tr>
       <tr><th scope="row">Inventário / missões</th><td>I / J</td></tr>
+      <tr><th scope="row">Classificação</th><td>R ou botão Classificação</td></tr>
     </tbody>
   </table>
   <p>Em tela cheia, use X ou B para voltar dentro do jogo. Esc também pode sair
@@ -335,6 +358,32 @@
     <button id="helpButton" type="button">Como jogar</button>
     <button id="soundButton" type="button" hidden aria-pressed="false">Som: desligado</button>
   </div>
+</dialog>
+<dialog id="rankingDialog" aria-labelledby="rankingTitle">
+  <h2 id="rankingTitle">Classificação online</h2>
+  <p class="ranking-intro">Use um apelido para preservar sua privacidade. A classificação publica apenas apelido, ano escolar, pontuação, acertos e progresso.</p>
+  <div class="ranking-toolbar">
+    <label for="rankingGrade">Filtrar por ano
+      <select id="rankingGrade" aria-label="Filtrar classificação por ano">
+        <option value="all">Todos os anos</option>
+        <option value="6">6º ano</option>
+        <option value="7">7º ano</option>
+        <option value="8">8º ano</option>
+        <option value="9">9º ano</option>
+      </select>
+    </label>
+    <button id="refreshRanking" type="button">Atualizar</button>
+  </div>
+  <p id="rankingStatus" class="ranking-status" role="status" aria-live="polite"></p>
+  <p id="rankingBest" class="ranking-best"></p>
+  <div class="ranking-table-wrap">
+    <table class="ranking-table">
+      <thead><tr><th class="ranking-pos">#</th><th>Aprendiz</th><th>Ano</th><th>Pontos</th><th>Acertos</th><th>Progresso</th></tr></thead>
+      <tbody id="rankingRows"><tr><td colspan="6">Nenhum resultado carregado.</td></tr></tbody>
+    </table>
+  </div>
+  <p class="ranking-note">A pontuação é calculada pelo próprio jogo e enviada somente quando uma aventura é concluída. Sem internet, o resultado fica em fila no aparelho e tenta sincronizar depois.</p>
+  <div class="dialog-actions"><button id="closeRanking" type="button">Voltar ao jogo</button></div>
 </dialog>
 <dialog id="inventoryDialog" aria-labelledby="inventoryTitle">
   <h2 id="inventoryTitle">Sua bolsa de aprendiz</h2>
@@ -366,6 +415,7 @@
   <div class="dialog-actions"><button id="closeInventory" type="button">Voltar ao jogo</button><button id="saveNow" type="button">Salvar agora</button></div>
 </dialog>
 </main>
+<script src="./ranking-config.js"></script>
 <script>
 (function () {
   'use strict';
@@ -379,6 +429,7 @@
    * 2. Arte procedural e buffers de fundos estáticos.
    * 3. Estado, regras, persistência e controles.
    * 4. handleInput(dt), update(dt), render(): os três blocos do loop.
+   * 5. Classificação online: REST do Supabase, com fila offline e fallback local.
    *
    * Referências conferidas para a proposta pedagógica (não carregadas pelo jogo):
    * BNCC, MEC: basenacionalcomum.mec.gov.br/images/BNCC_EI_EF_110518_versaofinal_site.pdf
@@ -581,6 +632,11 @@
   const avatarSelect = document.getElementById('avatar');
   const nameInput = document.getElementById('playerName');
   const inventoryDialog = document.getElementById('inventoryDialog');
+  const rankingDialog = document.getElementById('rankingDialog');
+  const rankingGradeSelect = document.getElementById('rankingGrade');
+  const rankingRows = document.getElementById('rankingRows');
+  const rankingStatus = document.getElementById('rankingStatus');
+  const rankingBest = document.getElementById('rankingBest');
   const rotateFullscreenCheck = document.getElementById('rotateFullscreen');
   const app = document.getElementById('app');
   const screenStage = document.getElementById('screenStage');
@@ -632,6 +688,10 @@
   let inputRepeat = 0, camera = {x:0,y:0}, audioContext = null, soundOn = false;
   let storageAllowed = true;
   const VIEW_SETTINGS_KEY = 'lexico.display.v1';
+  const RANKING_QUEUE_KEY = 'lexico.ranking.queue.v1';
+  const RANKING_PLAYER_KEY = 'lexico.ranking.player.v1';
+  const rankingConfig = window.LEXICO_RANKING_CONFIG || { url:'', anonKey:'', table:'lexico_ranking' };
+  let rankingBusy = false;
   const viewSettings = {mode:'auto',controls:'auto',doubleClick:true,sound:false,avatar:'boy',name:'',rotateFullscreen:true};
   let lastCanvasPointerType = 'mouse', fitPending = false, fullscreenFallback = false;
 
@@ -757,6 +817,140 @@
     const clean=String(value||'').replace(/[\u0000-\u001f\u007f<>]/g,'').replace(/\s+/g,' ').trim();
     return Array.from(clean).slice(0,18).join('')||'Aprendiz';
   }
+  function rankingConfigured() {
+    return !!(rankingConfig.url && rankingConfig.anonKey &&
+      /^https:\/\/[^\s]+$/.test(String(rankingConfig.url)) && rankingConfig.table);
+  }
+  function rankingEndpoint(path) {
+    return String(rankingConfig.url).replace(/\/+$/,'')+'/rest/v1/'+rankingConfig.table+path;
+  }
+  function rankingClientId() {
+    let id='';
+    try { id=localStorage.getItem(RANKING_PLAYER_KEY)||''; } catch(err) {}
+    if(id) return id;
+    try {
+      id=crypto.randomUUID ? crypto.randomUUID() :
+        'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+          const r=Math.random()*16|0,v=c==='x'?r:(r&3|8);return v.toString(16);
+        });
+      localStorage.setItem(RANKING_PLAYER_KEY,id);
+    } catch(err) {
+      id='guest-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+    }
+    return id;
+  }
+  function rankingReadQueue() {
+    try {
+      const raw=localStorage.getItem(RANKING_QUEUE_KEY),list=raw?JSON.parse(raw):[];
+      return Array.isArray(list)?list.slice(-20):[];
+    } catch(err) { return []; }
+  }
+  function rankingWriteQueue(list) {
+    try { localStorage.setItem(RANKING_QUEUE_KEY,JSON.stringify(list.slice(-20)));return true; }
+    catch(err) { return false; }
+  }
+  function setRankingStatus(message,kind) {
+    rankingStatus.textContent=message||'';
+    rankingStatus.dataset.kind=kind||'';
+  }
+  function calculateRankingScore(finalized) {
+    let attempts=0,correct=0;
+    game.stats.forEach(s=>{attempts+=s.attempts;correct+=s.correct;});
+    const errors=Math.max(0,attempts-correct),missions=countMissions(),seals=countSeals();
+    const base=correct*100-errors*25+missions*75+seals*150+game.battlesWon*25;
+    return clamp(Math.round(base+game.player.hp*2+(finalized?500:0)),0,999999);
+  }
+  function rankingSnapshot(finalized) {
+    let attempts=0,correct=0;
+    game.stats.forEach(s=>{attempts+=s.attempts;correct+=s.correct;});
+    return {
+      client_id:rankingClientId()+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),
+      apelido:cleanName(game.playerName),ano:game.grade,pontuacao:calculateRankingScore(finalized),
+      acertos:correct,erros:Math.max(0,attempts-correct),missoes:countMissions(),selos:countSeals(),
+      hp:clamp(game.player.hp,0,MAX_HP),finalizado:!!finalized
+    };
+  }
+  function queueRankingResult(snapshot) {
+    const queue=rankingReadQueue();queue.push(snapshot);rankingWriteQueue(queue);
+  }
+  async function syncRankingQueue() {
+    if(!rankingConfigured() || rankingBusy || !navigator.onLine) return;
+    const queue=rankingReadQueue();
+    if(!queue.length) return;
+    rankingBusy=true;
+    try {
+      const pending=[];
+      for(const item of queue) {
+        try {
+          const response=await fetch(rankingEndpoint(''),{
+            method:'POST',
+            headers:{apikey:rankingConfig.anonKey,Authorization:'Bearer '+rankingConfig.anonKey,
+              'Content-Type':'application/json',Prefer:'return=minimal'},
+            body:JSON.stringify(item)
+          });
+          if(!response.ok && response.status!==409) {pending.push(item);continue;}
+        } catch(err) { pending.push(item);break; }
+      }
+      rankingWriteQueue(pending);
+      if(!pending.length) setRankingStatus('Pontuações pendentes sincronizadas.','');
+    } finally { rankingBusy=false; }
+  }
+  async function submitRankingResult(finalized) {
+    if(game.rankingSubmitted) return;
+    const snapshot=rankingSnapshot(finalized);
+    queueRankingResult(snapshot);game.rankingSubmitted=true;
+    setRankingStatus('Pontuação '+snapshot.pontuacao+' preparada para a classificação.','');
+    await syncRankingQueue();
+  }
+  function renderRankingRows(rows) {
+    rankingRows.replaceChildren();rankingBest.textContent='';
+    if(!rows.length) {
+      const tr=document.createElement('tr'),td=document.createElement('td');
+      td.colSpan=6;td.textContent='Nenhum resultado publicado ainda.';tr.appendChild(td);rankingRows.appendChild(tr);return;
+    }
+    const medals=['🥇','🥈','🥉'];
+    rows.forEach((row,i)=>{
+      const tr=document.createElement('tr');
+      const values=[i<3?medals[i]:(i+1),row.apelido||'Aprendiz',(Number(row.ano)||0)+'º',
+        Number(row.pontuacao)||0,Number(row.acertos)||0,(Number(row.missoes)||0)+'/12'];
+      values.forEach((value,j)=>{
+        const td=document.createElement('td');td.textContent=String(value);
+        if(j===0) td.className='ranking-pos';if(j===3) td.className='ranking-score';tr.appendChild(td);
+      });
+      rankingRows.appendChild(tr);
+    });
+    const mine=cleanName(game.playerName),grade=game.grade;
+    const pos=rows.findIndex(r=>r.apelido===mine && Number(r.ano)===grade);
+    if(pos>=0) rankingBest.textContent='Sua posição nesta lista: #'+(pos+1)+'.';
+  }
+  async function refreshRanking() {
+    if(!rankingConfigured()) {
+      renderRankingRows([]);
+      setRankingStatus('O ranking está pronto, mas falta configurar o Supabase em ranking-config.js.','warn');return;
+    }
+    if(!navigator.onLine) {
+      renderRankingRows([]);
+      setRankingStatus('Sem internet. O ranking online não está disponível agora.','warn');return;
+    }
+    await syncRankingQueue();
+    rankingBusy=true;setRankingStatus('Carregando classificação…','');
+    try {
+      const grade=rankingGradeSelect.value;
+      const filter=grade==='all'?'':'&ano=eq.'+encodeURIComponent(grade);
+      const url=rankingEndpoint('?select=apelido,ano,pontuacao,acertos,missoes,criado_em&order=pontuacao.desc,criado_em.asc&limit=50'+filter);
+      const response=await fetch(url,{headers:{apikey:rankingConfig.anonKey,Authorization:'Bearer '+rankingConfig.anonKey}});
+      if(!response.ok) throw new Error('HTTP '+response.status);
+      const rows=await response.json();renderRankingRows(Array.isArray(rows)?rows:[]);
+      setRankingStatus('Classificação atualizada.','');
+    } catch(err) {
+      renderRankingRows([]);setRankingStatus('Não foi possível carregar a classificação agora.','error');
+    } finally { rankingBusy=false; }
+  }
+  function openRanking() {
+    clearInput();game.paused=true;
+    rankingGradeSelect.value=game.grade>=6&&game.grade<=9?String(game.grade):'all';
+    rankingDialog.showModal();refreshRanking();
+  }
   function setSaveStatus(message,status) {
     const target=document.getElementById('saveStatus');
     target.textContent=message;target.dataset.status=status||'saved';
@@ -779,7 +973,7 @@
     if(!welcome) scheduleScreenFit();
   }
   function resumeSimulation() {
-    game.paused=document.hidden || helpDialog.open || settingsDialog.open || inventoryDialog.open;
+    game.paused=document.hidden || helpDialog.open || settingsDialog.open || inventoryDialog.open || rankingDialog.open;
     lastTime=0;clearInput();dirty=true;
     if(game.started) canvas.focus({preventScroll:true});
   }
@@ -1194,7 +1388,7 @@
     explorations:[false,false,false,false],
     // 0: conversar; 1: buscar; 2: entregar; 3: prova; 4: guardião; 5: concluído.
     questProgress:[0,0,0,0],
-    battlesWon:0, usedQuestions:[], lastQuestion:null,
+    battlesWon:0, usedQuestions:[], lastQuestion:null, rankingSubmitted:false,
     battle:null, overlay:null, saved:null,
     message:'Converse com Lina na vila ou explore as quatro regiões.'
   };
@@ -1282,7 +1476,7 @@
     game.stats=resume?resume.stats.map(v=>({...v})):emptyStats();
     game.battlesWon=resume?resume.battlesWon:0;
     game.usedQuestions=resume?resume.usedQuestions.slice():[];
-    game.lastQuestion=resume?resume.lastQuestion:null;game.battle=null;game.overlay=null;
+    game.lastQuestion=resume?resume.lastQuestion:null;game.battle=null;game.overlay=null;game.rankingSubmitted=false;
     game.message=activeMission().goal+' B abre o mapa; J mostra as missões.';
     gradeSelect.value=String(grade);gradeSelect.disabled=true;
     changeState(STATES.OVERWORLD);saveGame();applyViewSettings();
@@ -1431,6 +1625,7 @@
     else if(r.next==='victory') {
       game.battlesWon++;game.player.hp=Math.min(MAX_HP,game.player.hp+30);
       tone('win');clearInput();changeState(STATES.VICTORY);
+      submitRankingResult(true);
       // O checkpoint da exploração permanece disponível para rever a aventura.
     }
   }
@@ -1545,7 +1740,7 @@
     if(target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) return;
     if(target && target.tagName==='BUTTON' && !target.hasAttribute('data-input')) return;
     const shortcuts={KeyF:toggleFullscreen,KeyO:openSettings,KeyH:openHelp,
-      KeyI:openInventory,KeyJ:openMissions,
+      KeyI:openInventory,KeyJ:openMissions,KeyR:openRanking,
       KeyM:()=>updateSound(!soundOn,true)};
     if(shortcuts[event.code]) {
       event.preventDefault();if(!event.repeat) shortcuts[event.code]();return;
@@ -1559,9 +1754,10 @@
   window.addEventListener('keyup',event=>{input.held.delete('key:'+event.code);});
   window.addEventListener('blur',()=>{saveGame();clearInput();});
   window.addEventListener('pagehide',saveGame);
+  window.addEventListener('online',()=>{syncRankingQueue();if(rankingDialog.open) refreshRanking();});
   document.addEventListener('visibilitychange',()=>{
     saveGame();clearInput();lastTime=0;
-    game.paused=document.hidden || helpDialog.open || settingsDialog.open || inventoryDialog.open;
+    game.paused=document.hidden || helpDialog.open || settingsDialog.open || inventoryDialog.open || rankingDialog.open;
     dirty=true;
   });
   document.querySelectorAll('[data-input]').forEach(button=>{
@@ -1623,6 +1819,11 @@
   document.getElementById('closeSettings').addEventListener('click',()=>settingsDialog.close());
   settingsDialog.addEventListener('close',()=>{resumeSimulation();scheduleScreenFit();});
   document.getElementById('inventoryButton').addEventListener('click',openInventory);
+  document.getElementById('rankingButton').addEventListener('click',openRanking);
+  document.getElementById('closeRanking').addEventListener('click',()=>rankingDialog.close());
+  rankingDialog.addEventListener('close',resumeSimulation);
+  document.getElementById('refreshRanking').addEventListener('click',refreshRanking);
+  rankingGradeSelect.addEventListener('change',refreshRanking);
   document.getElementById('closeInventory').addEventListener('click',()=>inventoryDialog.close());
   inventoryDialog.addEventListener('close',resumeSimulation);
   document.getElementById('inventoryDictionary').addEventListener('click',()=>useInventoryItem(2));
@@ -2020,7 +2221,8 @@
       'Seu HP chegou a zero. Uma dificuldade mostra o que merece ser revisto. Estude as explicações e tente outra vez.',36,185,572,24,30);
     let total=0,correct=0;
     game.stats.forEach(s=>{total+=s.attempts;correct+=s.correct;});
-    text(countSeals()+'/4 selos · '+correct+'/'+total+' respostas corretas',320,H-182,21,C.muted,'center');
+    text(countSeals()+'/4 selos · '+correct+'/'+total+' respostas corretas',320,H-205,20,C.muted,'center');
+    text('Pontuação da aventura: '+calculateRankingScore(won),320,H-177,21,C.gold,'center');
     buttonBox(74,H-135,492,52,'A / ENTER · REINICIAR '+game.grade+'º ANO',null,true,'A');
     buttonBox(74,H-70,492,45,'B / ESC · VOLTAR À ABERTURA',null,false,'B');
   }
