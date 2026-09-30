@@ -880,7 +880,8 @@
     rankingBusy=true;
     try {
       const pending=[];
-      for(const item of queue) {
+      for(let i=0;i<queue.length;i++) {
+        const item=queue[i];
         try {
           const response=await fetch(rankingEndpoint(''),{
             method:'POST',
@@ -888,8 +889,15 @@
               'Content-Type':'application/json',Prefer:'return=minimal'},
             body:JSON.stringify(item)
           });
-          if(!response.ok && response.status!==409) {pending.push(item);continue;}
-        } catch(err) { pending.push(item);break; }
+          if(!response.ok && response.status!==409) {
+            pending.push(item);
+            pending.push(...queue.slice(i+1));
+            break;
+          }
+        } catch(err) {
+          pending.push(...queue.slice(i));
+          break;
+        }
       }
       rankingWriteQueue(pending);
       if(!pending.length) setRankingStatus('Pontuações pendentes sincronizadas.','');
