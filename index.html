@@ -1,0 +1,2123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#13252e">
+<title>Léxico — Guardiões da Palavra</title>
+<style>
+  /* Interface nativa para os formulários; todas as ilustrações são Canvas. */
+  :root { color-scheme:dark; --paper:#f5edd6; --muted:#afc4c2; --ink:#13252e; --line:#35545e; --gold:#f4cd75; --teal:#6bb9ad; }
+  * { box-sizing:border-box; }
+  body { margin:0; overflow:hidden; background:#0c171e; color:var(--paper); font:16px/1.45 system-ui,sans-serif; }
+  button,input,select { font:inherit; }
+  button { cursor:pointer; color:var(--paper); background:#203944; border:1px solid var(--line); border-radius:9px; }
+  button:hover { background:#2c4b56; }
+  button:disabled { cursor:default; opacity:.5; }
+  button:focus-visible,input:focus-visible,select:focus-visible,canvas:focus-visible { outline:3px solid var(--gold); outline-offset:3px; }
+  [hidden] { display:none !important; }
+  #app { width:100%; height:100vh; height:100dvh; display:flex; flex-direction:column; padding:6px max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left)); background:#0c171e; }
+  header { flex:none; display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:4px; }
+  .brand { display:flex; align-items:center; gap:5px; }
+  .brand strong { font-size:19px; letter-spacing:.05em; }
+  .toolbar { display:flex; align-items:center; justify-content:flex-end; gap:5px; }
+  .toolbar button { padding:7px 9px; font-size:13px; min-height:38px; white-space:nowrap; }
+  .status-line { display:flex; flex:none; justify-content:space-between; gap:8px; font-size:11px; color:var(--muted); padding:0 3px 4px; }
+  #playerBadge { max-width:52%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #saveStatus { color:var(--teal); text-align:right; }
+  #saveStatus[data-status="unavailable"] { color:var(--gold); }
+  .game-layout { flex:1; min-height:0; min-width:0; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:minmax(0,1fr) auto; gap:8px; align-items:center; }
+  .screen-stage { grid-area:1 / 1 / 2 / 3; min-height:0; min-width:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+  .screen-shell { flex:none; width:640px; height:480px; border:2px solid var(--line); padding:2px; border-radius:6px; background:var(--ink); }
+  canvas { display:block; width:100%; height:100%; image-rendering:pixelated; background:var(--ink); touch-action:manipulation; }
+  .pad-side { grid-area:2 / 1; display:flex; align-items:center; justify-content:center; }
+  .dpad { display:grid; grid-template:repeat(3,52px) / repeat(3,52px); filter:drop-shadow(0 3px 0 #071116); }
+  .dpad button { border:0; border-radius:0; background:#314b58; font-size:29px; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+  .dpad button[data-input="up"] { grid-area:1 / 2; border-radius:8px 8px 0 0; }
+  .dpad button[data-input="left"] { grid-area:2 / 1; border-radius:8px 0 0 8px; }
+  .dpad button[data-input="right"] { grid-area:2 / 3; border-radius:0 8px 8px 0; }
+  .dpad button[data-input="down"] { grid-area:3 / 2; border-radius:0 0 8px 8px; }
+  .dpad-center { grid-area:2 / 2; background:#314b58; position:relative; }
+  .dpad-center::after { content:""; position:absolute; inset:14px; border-radius:50%; background:#20343f; }
+  .action-side { grid-area:2 / 2; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .ab { display:flex; gap:16px; align-items:center; }
+  .ab button { width:68px; height:68px; border-radius:50%; border:3px solid #577275; font:bold 29px system-ui; box-shadow:0 3px 0 #071116; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .ab button[data-input="A"] { background:#b96149; border-color:#ecac7c; transform:translateY(-6px); }
+  .ab button[data-input="B"] { background:#355564; }
+  [data-input].held { filter:brightness(1.35); box-shadow:none; }
+  .control-note { font-size:11px; color:var(--muted); text-align:center; margin:0; }
+  #notice { flex:none; font-size:12px; color:var(--gold); margin:3px 0; text-align:center; }
+  #notice:empty { display:none; }
+  .below { flex:none; font-size:12px; color:var(--muted); text-align:center; margin:4px 0 0; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  #app:fullscreen { width:100%; height:100%; }
+  #app:-webkit-full-screen { width:100%; height:100%; }
+  #app[data-controls="hide"] .pad-side,#app[data-controls="hide"] .action-side { display:none; }
+  #app[data-controls="hide"] .game-layout { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); gap:0; }
+  #app[data-controls="hide"] .screen-stage { grid-area:1 / 1; }
+  #app[data-controls="show"][data-dock="side"] .game-layout { grid-template-columns:148px minmax(0,1fr) 156px; grid-template-rows:minmax(0,1fr); gap:4px; }
+  #app[data-controls="show"][data-dock="side"] .screen-stage { grid-area:1 / 2; }
+  #app[data-controls="show"][data-dock="side"] .pad-side { grid-area:1 / 1; }
+  #app[data-controls="show"][data-dock="side"] .action-side { grid-area:1 / 3; }
+  #app[data-dock="side"] .dpad { grid-template:repeat(3,48px) / repeat(3,48px); }
+  #app[data-dock="side"] .ab { gap:8px; }
+  #app[data-dock="side"] .ab button { width:68px; height:68px; }
+  /* O cenário chega à borda útil do celular; as áreas de recorte ficam protegidas. */
+  #app[data-interface="mobile"],#app[data-viewport="portrait"] { padding-top:2px; padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right); padding-bottom:max(3px,env(safe-area-inset-bottom)); }
+  #app[data-interface="mobile"] .screen-shell,#app[data-viewport="portrait"] .screen-shell { border-width:1px; padding:0; border-radius:2px; }
+  #app[data-viewport="portrait"] .game-layout { flex:none; align-content:start; grid-template-rows:auto auto; row-gap:10px; }
+  #app[data-viewport="portrait"] .screen-stage { height:auto; }
+  #app[data-interface="mobile"] .below,#app[data-viewport="portrait"] .below { display:none; }
+  #app.is-immersive { padding-top:3px; }
+  #app.is-immersive .below { display:none; }
+  .onboarding { flex:1; min-height:0; width:100%; max-width:1100px; margin:auto; overflow-y:auto; padding:12px; display:grid; grid-template-columns:minmax(0,1.2fr) minmax(310px,.85fr); align-items:center; gap:32px; }
+  #app[data-screen="welcome"] .game-layout,#app[data-screen="welcome"] .status-line,#app[data-screen="welcome"] .below,#app[data-screen="welcome"] #inventoryButton { display:none; }
+  .opening-brand { text-align:center; margin-bottom:15px; }
+  .opening-brand h1 { margin:0; font:800 clamp(38px,5vw,62px)/1.1 system-ui; letter-spacing:.12em; color:var(--paper); }
+  .opening-brand p { margin:5px 0 0; color:var(--gold); font-size:13px; letter-spacing:.13em; }
+  .opening-art { width:100%; height:auto; aspect-ratio:24 / 11; border:1px solid var(--line); border-radius:12px; }
+  .opening-caption { color:var(--muted); margin:12px auto 0; max-width:430px; font-size:14px; text-align:center; }
+  .start-form { display:grid; gap:14px; padding:20px; background:var(--ink); border:1px solid var(--line); border-radius:16px; }
+  .start-form h2 { margin:0; font-size:23px; color:var(--gold); }
+  .field { display:grid; gap:5px; font-size:14px; }
+  input[type="text"],select { width:100%; min-height:44px; padding:8px 11px; color:var(--paper); background:#0c1a22; border:1px solid #456471; border-radius:8px; }
+  .start-form fieldset { margin:0; padding:0; border:0; }
+  .start-form legend { font-size:14px; margin-bottom:7px; }
+  .avatar-cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .avatar-card { display:flex; align-items:center; justify-content:center; gap:10px; min-height:70px; padding:7px; }
+  .avatar-card[aria-pressed="true"] { border:2px solid var(--gold); background:#304b51; }
+  .avatar-card canvas { width:38px; height:48px; background:transparent; }
+  .start-primary { padding:12px; min-height:48px; font-weight:700; background:#346a63; border-color:var(--teal); }
+  .start-primary:hover { background:#408477; }
+  .resume-button { padding:10px; min-height:44px; }
+  #resumeDetails { color:var(--muted); font-size:12px; margin:0; text-align:center; }
+  .opening-save-note { font-size:12px; color:var(--muted); margin:0; text-align:center; }
+  dialog { color:var(--paper); background:var(--ink); border:2px solid var(--line); border-radius:14px; max-width:690px; width:calc(100% - 24px); max-height:88vh; max-height:88dvh; padding:20px; overflow-y:auto; }
+  dialog::backdrop { background:#000b; }
+  dialog h2 { margin:0 0 12px; font-size:24px; color:var(--gold); }
+  dialog h3 { font-size:18px; }
+  dialog li { margin-bottom:8px; }
+  dialog table { border-collapse:collapse; width:100%; font-size:14px; }
+  dialog td,dialog th { padding:8px; border-bottom:1px solid var(--line); text-align:left; }
+  dialog button { padding:10px 14px; min-height:44px; }
+  .settings-fields { display:grid; gap:14px; margin:18px 0; }
+  .settings-fields label { display:grid; gap:5px; }
+  .settings-fields .check-row { display:flex; gap:10px; align-items:center; }
+  .check-row input { width:20px; height:20px; accent-color:var(--teal); }
+  .dialog-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+  #displaySummary { color:var(--muted); }
+  .inventory-summary { color:var(--muted); margin:0 0 15px; }
+  .item-list { display:grid; gap:10px; }
+  .inventory-item { display:grid; grid-template-columns:45px minmax(0,1fr); gap:10px; padding:12px; background:#0e2029; border:1px solid var(--line); border-radius:10px; }
+  .inventory-item canvas { width:40px; height:40px; background:transparent; }
+  .inventory-item strong { color:var(--paper); }
+  .inventory-item p { font-size:13px; color:var(--muted); margin:4px 0 8px; }
+  .inventory-item button { font-size:13px; padding:8px 10px; }
+  .seal-list { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:10px 0; }
+  .seal-list span { padding:8px; font-size:13px; border:1px solid var(--line); border-radius:6px; color:var(--muted); }
+  .seal-list span[data-earned="true"] { color:var(--gold); border-color:#b38747; }
+  #inventorySaveNote { color:var(--muted); font-size:13px; }
+  @media (max-width:700px) {
+    .onboarding { display:flex; flex-direction:column; gap:14px; align-items:stretch; padding:8px 6px 18px; }
+    .opening-brand { margin-bottom:10px; }
+    .opening-brand h1 { font-size:39px; }
+    .opening-caption { display:none; }
+    .opening-art { max-height:190px; object-fit:contain; }
+    .start-form { padding:16px; gap:12px; }
+    .start-form h2 { font-size:21px; }
+  }
+  @media (max-width:430px) {
+    .brand strong { font-size:16px; }
+    .toolbar { gap:4px; }
+    .toolbar button { font-size:12px; padding:6px 7px; min-height:36px; }
+    .dpad { grid-template:repeat(3,52px) / repeat(3,52px); }
+    .ab button { width:68px; height:68px; }
+    .status-line { font-size:10px; }
+  }
+  @media (orientation:landscape) and (max-height:600px) {
+    #app { padding-top:3px; }
+    header { margin-bottom:2px; }
+    .brand strong { font-size:16px; }
+    .toolbar button { padding:3px 8px; min-height:30px; font-size:12px; }
+    .status-line { font-size:10px; padding-bottom:2px; }
+    .below { display:none; }
+    .onboarding { gap:18px; padding:8px; }
+    .opening-brand h1 { font-size:36px; }
+    .opening-caption { display:none; }
+    .start-form { padding:12px; gap:9px; }
+    .avatar-card { min-height:58px; }
+  }
+  @media (orientation:landscape) and (max-width:760px) {
+    #app[data-controls="show"][data-dock="side"] .game-layout { grid-template-columns:148px minmax(0,1fr) 80px; }
+    #app[data-dock="side"] .ab { flex-direction:column-reverse; gap:12px; }
+    #app[data-dock="side"] .control-note { display:none; }
+  }
+</style>
+</head>
+<body>
+<main id="app" data-screen="welcome" data-interface="desktop" data-controls="hide" data-dock="side">
+  <header>
+    <div class="brand"><strong>LÉXICO</strong></div>
+    <div class="toolbar">
+      <button id="inventoryButton" type="button" title="Inventário (I)">Bolsa</button>
+      <button id="fullButton" type="button" title="Tela cheia (F)">⛶ Tela cheia</button>
+      <button id="settingsButton" type="button" title="Opções (O)">Opções</button>
+    </div>
+  </header>
+  <div class="status-line"><span id="playerBadge"></span><span id="saveStatus" role="status">Salvamento automático</span></div>
+  <section id="onboarding" class="onboarding" aria-labelledby="openingTitle">
+    <div class="opening-scene">
+      <div class="opening-brand"><h1 id="openingTitle">LÉXICO</h1><p>GUARDIÕES DA PALAVRA</p></div>
+      <canvas id="openingArt" class="opening-art" width="960" height="440" aria-label="Um livro luminoso abre os caminhos de uma vila entre bosques, ruínas e histórias."></canvas>
+      <p class="opening-caption">O Ruído embaralhou as histórias. Explore quatro regiões, descubra pistas e devolva as palavras à vila.</p>
+    </div>
+    <form id="startForm" class="start-form">
+      <h2>Sua aventura começa aqui</h2>
+      <label class="field" for="playerName">Nome do personagem
+        <input id="playerName" type="text" maxlength="18" autocomplete="nickname" placeholder="Como você quer se chamar?" value="" enterkeyhint="done">
+      </label>
+      <fieldset><legend>Escolha seu personagem</legend>
+        <div class="avatar-cards">
+          <button id="chooseBoy" class="avatar-card" type="button" aria-pressed="true"><canvas id="boyPreview" width="64" height="80" aria-hidden="true"></canvas><span>Menino</span></button>
+          <button id="chooseGirl" class="avatar-card" type="button" aria-pressed="false"><canvas id="girlPreview" width="64" height="80" aria-hidden="true"></canvas><span>Menina</span></button>
+        </div>
+        <select id="avatar" hidden aria-label="Personagem escolhido"><option value="boy">Menino</option><option value="girl">Menina</option></select>
+      </fieldset>
+      <label class="field" for="grade">Ano escolar
+        <select id="grade" aria-label="Ano escolar da nova aventura"><option value="6">6º ano</option><option value="7">7º ano</option><option value="8">8º ano</option><option value="9">9º ano</option></select>
+      </label>
+      <button id="startButton" class="start-primary" type="submit">Começar aventura →</button>
+      <button id="resumeButton" class="resume-button" type="button" hidden>Continuar aventura</button>
+      <p id="resumeDetails" hidden></p>
+      <p class="opening-save-note">Seu progresso é salvo automaticamente neste navegador.</p>
+    </form>
+  </section>
+  <div class="game-layout">
+    <div class="screen-stage" id="screenStage">
+    <div class="screen-shell">
+      <canvas id="game" width="640" height="480" tabindex="0"
+        aria-label="Léxico, RPG de Língua Portuguesa. Use setas para explorar, Enter para confirmar e X para voltar. F alterna tela cheia; O abre opções."
+        aria-describedby="accessibleState">Seu navegador precisa oferecer suporte a Canvas 2D.</canvas>
+    </div>
+    </div>
+    <div class="pad-side">
+      <div class="dpad" role="group" aria-label="Controle direcional">
+        <button type="button" data-input="up" aria-label="Cima">▲</button>
+        <button type="button" data-input="left" aria-label="Esquerda">◀</button>
+        <span class="dpad-center" aria-hidden="true"></span>
+        <button type="button" data-input="right" aria-label="Direita">▶</button>
+        <button type="button" data-input="down" aria-label="Baixo">▼</button>
+      </div>
+    </div>
+    <div class="action-side">
+      <div class="ab" role="group" aria-label="Botões de ação">
+        <button type="button" data-input="B" aria-label="B: voltar ou abrir caderno">B</button>
+        <button type="button" data-input="A" aria-label="A: interagir ou confirmar">A</button>
+      </div>
+      <p class="control-note">A · confirmar / conversar<br>B · voltar / caderno</p>
+    </div>
+  </div>
+  <p id="notice" role="status"></p>
+  <p class="below">WASD ou setas · Enter / Espaço = A · Esc = B · Toque nas opções para selecionar</p>
+  <p id="accessibleState" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+  <section id="accessibleChoices" class="sr-only" aria-label="Opções da tela atual"></section>
+<dialog id="helpDialog" aria-labelledby="helpTitle">
+  <h2 id="helpTitle">Um mundo para ler e explorar</h2>
+  <p>O Ruído embaralhou as palavras de Léxico. Conquiste os quatro selos e entre no
+  Arquivo Central para recuperar as histórias da vila.</p>
+  <ul>
+    <li>Escreva seu nome, escolha o ano escolar e o personagem e aperte <strong>A / Enter</strong> para iniciar. Na abertura,
+    <strong>B / Esc</strong> continua a aventura salva, quando houver uma.</li>
+    <li>Caminhe com <strong>WASD, setas ou D-Pad</strong>. O personagem termina um
+    quadrado antes de começar o próximo. A grama alta pode iniciar batalhas.</li>
+    <li>No computador, <strong>Enter, Espaço ou Z</strong> confirma e <strong>X ou B</strong>
+    volta sem sair da tela cheia. <strong>F</strong> alterna a tela cheia,
+    <strong>O</strong> abre as opções, <strong>H</strong> abre a ajuda e
+    <strong>M</strong> liga ou desliga o som.</li>
+    <li>Use <strong>Opções</strong> para escolher computador ou celular e mostrar ou
+    ocultar o D-Pad. A bolsa também pode ser aberta com <strong>I</strong>; <strong>J</strong> mostra as missões. No mouse, um clique seleciona e um <strong>duplo clique</strong>
+    confirma uma alternativa ou ação do menu. Essa confirmação pode ser desativada.</li>
+    <li>Aproxime-se de pessoas, placas e guardiões e aperte <strong>A</strong>.
+    São <strong>12 missões em quatro capítulos</strong>: recupere e entregue páginas, supere a prova e conquiste o selo de cada região. Cada selo libera o capítulo seguinte. Os inimigos ganham HP e causam mais dano com o avanço. <strong>B</strong> abre o mapa; <strong>J</strong> ou a bolsa abre as missões.
+    As clareiras de estudo oferecem explicações e um dicionário na primeira visita. O alvo dourado indica o objetivo atual.</li>
+    <li><strong>ANALISAR:</strong> resolva uma questão. Cada acerto tira 30 HP do inimigo;
+    cada erro tira HP do aprendiz. O comentário explica a resposta.</li>
+    <li><strong>ESTUDAR:</strong> recupera 35 HP, mas o monstro contra-ataca.
+    Há três estudos por batalha. A bibliotecária da vila recupera todo o HP.</li>
+    <li><strong>DICIONÁRIO:</strong> consome um item e elimina duas alternativas incorretas
+    da próxima questão. Nessa questão, B abre uma dica de raciocínio.</li>
+    <li><strong>FUGIR:</strong> volta ao mapa sem prêmio. Guardiões também podem ser
+    abandonados e enfrentados novamente.</li>
+    <li>As questões e os comentários <strong>não têm limite de tempo</strong>.
+    Depois de ler o comentário, avance com A. O progresso é salvo após passos e batalhas,
+    quando o navegador permite armazenamento local.</li>
+  </ul>
+  <h3>Para usar na aula</h3>
+  <p>O banco contém 128 questões autorais, 32 por ano, com oito itens de cada eixo:
+  Morfologia, Sintaxe, Ortografia e Literatura Brasileira. Há trechos curtos de
+  Gonçalves Dias e Machado de Assis, ambos em domínio público; os demais microtextos
+  são originais. Os desafios selecionam somente questões do ano escolhido.</p>
+  <table>
+    <thead><tr><th>Ano</th><th>Referências da BNCC trabalhadas no jogo</th></tr></thead>
+    <tbody>
+      <tr><td>6º</td><td>EF06LP04, EF06LP05, EF06LP06, EF06LP08, EF06LP09, EF67LP32, EF67LP38, EF69LP44, EF69LP47</td></tr>
+      <tr><td>7º</td><td>EF07LP03, EF07LP07, EF07LP08, EF07LP09, EF07LP11, EF67LP32, EF67LP33, EF67LP34, EF67LP35, EF67LP38, EF69LP44, EF69LP47</td></tr>
+      <tr><td>8º</td><td>EF08LP04, EF08LP05, EF08LP06, EF08LP07, EF08LP08, EF08LP09, EF08LP11, EF08LP12, EF69LP44, EF69LP47, EF89LP32, EF89LP33</td></tr>
+      <tr><td>9º</td><td>EF09LP04, EF09LP05, EF09LP08, EF09LP09, EF69LP44, EF69LP47, EF89LP32, EF89LP37</td></tr>
+    </tbody>
+  </table>
+  <p>As associações são uma proposta de apoio à aprendizagem, não uma cobertura integral
+  das habilidades. Questões de reconhecimento apoiam a revisão; habilidades de produção
+  textual também exigem atividades de escrita fora do jogo.</p>
+  <p>Sugestão: joguem em duplas, justifiquem cada escolha antes de confirmar e, ao final,
+  reescrevam frases com os conceitos revisados. O caderno mostra acertos por eixo,
+  sem transformar tentativas em uma nota escolar.</p>
+  <button id="closeHelp" type="button">Voltar ao jogo</button>
+</dialog>
+<dialog id="settingsDialog" aria-labelledby="settingsTitle">
+  <h2 id="settingsTitle">Opções de tela e controles</h2>
+  <p>No celular em pé, o jogo usa uma área quadrada e mostra mais do mapa.
+  No computador e no celular deitado, usa 4:3. Os controles ficam perto da tela.</p>
+  <div class="settings-fields">
+    <label for="displayMode">Modo de interface
+      <select id="displayMode">
+        <option value="auto">Automático</option>
+        <option value="desktop">Computador — teclado e mouse</option>
+        <option value="mobile">Celular — controles de toque</option>
+      </select>
+    </label>
+    <label for="touchControls">D-Pad e botões A/B na tela
+      <select id="touchControls">
+        <option value="auto">Automático conforme o modo</option>
+        <option value="show">Mostrar controles</option>
+        <option value="hide">Ocultar controles</option>
+      </select>
+    </label>
+    <label class="check-row" for="doubleClickConfirm">
+      <input id="doubleClickConfirm" type="checkbox" checked>
+      Duplo clique confirma alternativas e ações do menu
+    </label>
+    <label class="check-row" for="rotateFullscreen">
+      <input id="rotateFullscreen" type="checkbox" checked>
+      Preferir paisagem em tela cheia no celular
+    </label>
+    <label class="check-row" for="settingsSound">
+      <input id="settingsSound" type="checkbox">
+      Ativar efeitos sonoros
+    </label>
+  </div>
+  <p id="displaySummary" aria-live="polite"></p>
+  <h3>Atalhos no computador</h3>
+  <table>
+    <tbody>
+      <tr><th scope="row">Mover / selecionar</th><td>WASD ou setas</td></tr>
+      <tr><th scope="row">Confirmar</th><td>Enter, Espaço ou Z</td></tr>
+      <tr><th scope="row">Voltar / caderno</th><td>X, B ou Esc</td></tr>
+      <tr><th scope="row">Tela cheia</th><td>F</td></tr>
+      <tr><th scope="row">Opções / ajuda</th><td>O / H</td></tr>
+      <tr><th scope="row">Som</th><td>M</td></tr>
+      <tr><th scope="row">Inventário / missões</th><td>I / J</td></tr>
+    </tbody>
+  </table>
+  <p>Em tela cheia, use X ou B para voltar dentro do jogo. Esc também pode sair
+  da tela cheia pelo próprio navegador.</p>
+  <div class="dialog-actions">
+    <button id="closeSettings" type="button">Voltar ao jogo</button>
+    <button id="settingsFullscreen" type="button">Tela cheia</button>
+    <button id="helpButton" type="button">Como jogar</button>
+    <button id="soundButton" type="button" hidden aria-pressed="false">Som: desligado</button>
+  </div>
+</dialog>
+<dialog id="inventoryDialog" aria-labelledby="inventoryTitle">
+  <h2 id="inventoryTitle">Sua bolsa de aprendiz</h2>
+  <p id="inventorySummary" class="inventory-summary"></p>
+  <div class="item-list">
+    <article class="inventory-item"><canvas id="dictionaryIcon" width="40" height="40" aria-hidden="true"></canvas><div>
+      <strong id="dictionaryCount">Dicionários</strong>
+      <p>Eliminam duas alternativas incorretas e liberam uma dica específica da próxima questão.</p>
+      <button id="inventoryDictionary" type="button">Preparar dicionário</button>
+    </div></article>
+    <article class="inventory-item"><canvas id="studyIcon" width="40" height="40" aria-hidden="true"></canvas><div>
+      <strong id="studyCount">Estudos</strong>
+      <p>Recupere 35 HP durante a batalha. O monstro contra-ataca; há três estudos por confronto.</p>
+      <button id="inventoryStudy" type="button">Estudar e recuperar HP</button>
+    </div></article>
+    <article class="inventory-item"><canvas id="missionIcon" width="40" height="40" aria-hidden="true"></canvas><div>
+      <strong id="missionCount">Missões</strong>
+      <p id="missionGoal"></p><p id="carriedPages"></p>
+      <button id="inventoryMissions" type="button">Ver missões</button>
+    </div></article>
+    <article class="inventory-item"><canvas id="journalIcon" width="40" height="40" aria-hidden="true"></canvas><div>
+      <strong>Caderno de exploração</strong>
+      <p>Consulte o mapa, as clareiras de estudo e suas descobertas.</p>
+      <button id="inventoryJournal" type="button">Abrir caderno</button>
+    </div></article>
+  </div>
+  <h3>Selos conquistados</h3><div id="inventorySeals" class="seal-list"></div>
+  <p id="inventorySaveNote"></p>
+  <div class="dialog-actions"><button id="closeInventory" type="button">Voltar ao jogo</button><button id="saveNow" type="button">Salvar agora</button></div>
+</dialog>
+</main>
+<script>
+(function () {
+  'use strict';
+
+  /*
+   * LÉXICO — Guardiões da Palavra
+   * Arquivo único, scripts clássicos, nenhuma requisição de rede.
+   *
+   * Organização:
+   * 1. Configuração, JSON de questões e mundo.
+   * 2. Arte procedural e buffers de fundos estáticos.
+   * 3. Estado, regras, persistência e controles.
+   * 4. handleInput(dt), update(dt), render(): os três blocos do loop.
+   *
+   * Referências conferidas para a proposta pedagógica (não carregadas pelo jogo):
+   * BNCC, MEC: basenacionalcomum.mec.gov.br/images/BNCC_EI_EF_110518_versaofinal_site.pdf
+   * Gonçalves Dias: academia.org.br/academicos/goncalves-dias/textos-escolhidos
+   * Machado de Assis: dominiopublico.mec.gov.br, obra 16953, capítulo XVII.
+   */
+
+  const W = 640, TILE = 16, SCALE = 2;
+  let H = 480; // 640 em retrato no celular; 480 em paisagem ou no computador.
+  const WORLD_W = 112, WORLD_H = 88;
+  const HUB = Object.freeze({x:56,y:46});
+  const VIEW = { x: 0, y: 64, w: 320, h: 160 };
+  const MAX_HP = 100, CRITICAL_DAMAGE = 30, ENCOUNTER_CHANCE = 0.30;
+  const SAVE_KEY = 'lexico.guardioes.v1';
+  const STATES = Object.freeze({
+    OVERWORLD: 'OVERWORLD', BATTLE_INTRO: 'BATTLE_INTRO',
+    BATTLE_MENU: 'BATTLE_MENU', BATTLE_QUESTION: 'BATTLE_QUESTION',
+    BATTLE_RESULT: 'BATTLE_RESULT', GAME_OVER: 'GAME_OVER', VICTORY: 'VICTORY'
+  });
+  const T = Object.freeze({ GRASS: 0, HIGH: 1, PATH: 2, WATER: 3, TREE: 4, WALL: 5, FLOOR: 6 });
+  const C = Object.freeze({
+    ink:'#13252e', dark:'#0c171e', border:'#456471', paper:'#f5edd6',
+    muted:'#afc4c2', gold:'#f4cd75', goldDark:'#b38747', white:'#fff9e9',
+    green:'#6faa74', greenDark:'#32624e', grass:'#77a76a', grassLight:'#9cc57d',
+    blue:'#64a6c4', blueDark:'#376587', water:'#437f9a', waterLight:'#75b6c3',
+    orange:'#d49262', orangeDark:'#95523c', purple:'#a58ebc', purpleDark:'#67537f',
+    red:'#d56b62', path:'#d5bf87', pathDark:'#ac946d', rock:'#758d88',
+    tree:'#365d48', treeLight:'#4f7956', treeDark:'#254936', trunk:'#76513c',
+    skin:'#ce9566', skinLight:'#edba80', hair:'#49352f', coat:'#c76049',
+    teal:'#6bb9ad', tealDark:'#347e7b'
+  });
+  const REGIONS = [
+    { name:'Bosque das Formas', topic:'Morfologia', monster:'Flexino', color:C.green, dark:C.greenDark, x:18, y:14 },
+    { name:'Ruínas da Frase', topic:'Sintaxe', monster:'Sintax', color:C.blue, dark:C.blueDark, x:93, y:14 },
+    { name:'Vale da Escrita', topic:'Ortografia', monster:'Ortograf', color:C.orange, dark:C.orangeDark, x:18, y:72 },
+    { name:'Jardim das Histórias', topic:'Literatura Brasileira', monster:'Cordélio', color:C.purple, dark:C.purpleDark, x:93, y:72 }
+  ];
+  // Três missões por capítulo: buscar e devolver páginas, superar uma prova,
+  // recuperar o selo. Os capítulos seguintes exigem os selos anteriores.
+  const CHAPTERS = [
+    {pages:'Páginas das Formas',trial:'Rasurino',chest:{x:8,y:8},arena:{x:30,y:25},
+      titles:['O livro sem formas','A prova das palavras','O selo das formas']},
+    {pages:'Páginas da Frase',trial:'Frasídeo',chest:{x:103,y:8},arena:{x:81,y:25},
+      titles:['A frase desfeita','A prova das conexões','O selo das frases']},
+    {pages:'Páginas da Escrita',trial:'Trocaletras',chest:{x:8,y:79},arena:{x:30,y:61},
+      titles:['As letras perdidas','A prova da revisão','O selo da escrita']},
+    {pages:'Páginas das Histórias',trial:'Eco de Papel',chest:{x:103,y:79},arena:{x:81,y:61},
+      titles:['A história esquecida','A prova das vozes','O selo das histórias']}
+  ];
+  const LESSONS = [
+    'Morfologia: a classe depende do uso. Em “o cantar”, o verbo passa a nomear uma ação; em “ela canta”, o verbo apresenta essa ação. Compare a palavra com o restante da frase.',
+    'Sintaxe: encontre primeiro o verbo. Depois pergunte de quem se fala e quais termos completam ou modificam a ação. Nem toda palavra depois do verbo é objeto.',
+    'Ortografia: observe o sentido antes de escolher a escrita. “Viagem” dá nome ao passeio; “viajem” é uma forma verbal. “Traz” indica uma ação; “trás”, uma posição.',
+    'Literatura: autor, narrador e personagem não são a mesma coisa. Investigue quem conta, o que essa voz sabe e quais pistas sustentam sua interpretação.'
+  ];
+  const DIRECTIONS = {
+    up:{ x:0,y:-1 }, down:{ x:0,y:1 }, left:{ x:-1,y:0 }, right:{ x:1,y:0 }
+  };
+
+  // JSON interno: índices corretos na base zero. Feedback e dica são campos distintos.
+  // As alternativas são embaralhadas na apresentação, junto com o índice do gabarito.
+  const QUESTIONS = [
+    {"id":"6-M1","grade":6,"topic":"Morfologia","skill":"EF06LP04","prompt":"Em “A menina curiosa abriu o livro”, a palavra “curiosa” é:","options":["Substantivo","Verbo","Adjetivo","Artigo"],"answer":2,"hint":"Observe qual palavra atribui uma característica à menina.","feedback":"“Curiosa” caracteriza o substantivo “menina”; por isso, é um adjetivo. Ela concorda com “menina” no feminino singular."},
+    {"id":"6-M2","grade":6,"topic":"Morfologia","skill":"EF06LP04","prompt":"No aviso “Feche o livro com cuidado”, o verbo “feche” expressa:","options":["Uma ordem ou orientação","Um fato passado","Uma dúvida sem pedido","O nome de um objeto"],"answer":0,"hint":"O aviso orienta uma ação de quem está lendo.","feedback":"“Feche” está no modo imperativo e dirige uma orientação ao leitor. Dependendo do contexto, o imperativo também pode expressar pedido, conselho ou convite."},
+    {"id":"6-M3","grade":6,"topic":"Morfologia","skill":"EF06LP04","prompt":"Em “O barco atravessou o rio”, qual palavra dá nome a um ser ou elemento?","options":["atravessou","barco","o","um"],"answer":1,"hint":"Procure a palavra que nomeia, em vez de indicar uma ação.","feedback":"“Barco” é substantivo: nomeia um elemento. “Rio” também é substantivo no trecho; “atravessou” é o verbo. A classificação precisa considerar o uso na frase."},
+    {"id":"6-M4","grade":6,"topic":"Morfologia","skill":"EF06LP04","prompt":"Na frase “Os livros antigos foram guardados”, “antigos” concorda com “livros” em:","options":["Feminino singular","Masculino plural","Feminino plural","Masculino singular"],"answer":1,"hint":"Observe o gênero e o número do substantivo caracterizado.","feedback":"“Antigos” é um adjetivo no masculino plural, como “livros”. A terminação do adjetivo acompanha o substantivo que ele caracteriza."},
+    {"id":"6-M5","grade":6,"topic":"Morfologia","skill":"EF06LP04","prompt":"Em “Ontem, a turma visitou o museu”, o verbo “visitou” apresenta:","options":["Uma ação passada","Uma ação futura","Um pedido direto","Uma hipótese"],"answer":0,"hint":"O marcador “ontem” ajuda a localizar o acontecimento.","feedback":"“Visitou” está no pretérito perfeito do indicativo: apresenta uma ação concluída no passado. O advérbio “ontem” confirma essa localização no tempo."},
+    {"id":"6-M6","grade":6,"topic":"Morfologia","skill":"EF06LP05","prompt":"Em “Talvez a turma encontre um livro raro”, o uso de “talvez” e “encontre” expressa:","options":["Certeza absoluta","Possibilidade","Uma ordem","Um fato concluído"],"answer":1,"hint":"A fala apresenta o encontro como algo que pode acontecer.","feedback":"O trecho expressa possibilidade. O subjuntivo “encontre”, associado a “talvez”, evita apresentar o acontecimento como uma certeza."},
+    {"id":"6-M7","grade":6,"topic":"Morfologia","skill":"EF06LP04","prompt":"Na frase “As crianças organizaram o sarau”, a forma “organizaram” indica:","options":["Uma criança","Duas bibliotecas","Mais de uma pessoa","Um objeto"],"answer":2,"hint":"Relacione a forma verbal ao sujeito “as crianças”.","feedback":"O verbo está na terceira pessoa do plural e se relaciona a “as crianças”. Ele apresenta a ação realizada por mais de uma criança, sem determinar uma quantidade exata."},
+    {"id":"6-M8","grade":6,"topic":"Morfologia","skill":"EF06LP04","prompt":"Em “A janela azul iluminava a sala”, qual é o adjetivo?","options":["janela","iluminava","sala","azul"],"answer":3,"hint":"Busque a palavra que atribui uma característica à janela.","feedback":"“Azul” é o adjetivo que caracteriza “janela”. “Janela” e “sala” são substantivos; “iluminava” é o verbo da oração."},
+    {"id":"6-S1","grade":6,"topic":"Sintaxe","skill":"EF06LP08","prompt":"“João leu e Ana escreveu.” Quantas orações há nesse período?","options":["Nenhuma","Uma","Duas","Três"],"answer":2,"hint":"Procure os núcleos verbais: cada um organiza uma oração.","feedback":"Há duas orações: “João leu” e “Ana escreveu”. Os dois núcleos verbais, “leu” e “escreveu”, estão ligados pela conjunção “e”."},
+    {"id":"6-S2","grade":6,"topic":"Sintaxe","skill":"EF06LP06","prompt":"Na norma-padrão, qual frase apresenta concordância adequada?","options":["As histórias encanta.","As história encantam.","A histórias encanta.","As histórias encantam."],"answer":3,"hint":"Compare o número do substantivo com o do artigo e do verbo.","feedback":"“As histórias encantam” tem artigo, substantivo e verbo no plural. A concordância nominal liga “as” a “histórias”; a verbal liga “encantam” ao sujeito."},
+    {"id":"6-S3","grade":6,"topic":"Sintaxe","skill":"EF06LP08","prompt":"Em “O sabiá cantou no quintal”, qual é o núcleo verbal da oração?","options":["sabiá","quintal","cantou","no"],"answer":2,"hint":"Localize a palavra que apresenta a ação.","feedback":"“Cantou” é o núcleo verbal. Uma oração se organiza em torno de um verbo ou de uma locução verbal; os demais termos se relacionam a esse núcleo."},
+    {"id":"6-S4","grade":6,"topic":"Sintaxe","skill":"EF06LP09","prompt":"“A professora chegou e os alunos abriram os cadernos.” Esse período é:","options":["Simples","Composto","Sem verbos","Só uma palavra"],"answer":1,"hint":"Conte os núcleos verbais que organizam as orações.","feedback":"O período é composto: contém as orações organizadas pelos verbos “chegou” e “abriram”. Um período simples possui apenas uma oração."},
+    {"id":"6-S5","grade":6,"topic":"Sintaxe","skill":"EF06LP06","prompt":"Na norma-padrão, qual forma completa “A turma ___ o poema”?","options":["leram","leu","lemos","lerão"],"answer":1,"hint":"O núcleo “turma” está no singular, embora se refira a várias pessoas.","feedback":"“A turma leu o poema” apresenta concordância com o sujeito singular “a turma”. O sentido coletivo do substantivo não torna esse sujeito plural."},
+    {"id":"6-S6","grade":6,"topic":"Sintaxe","skill":"EF06LP06","prompt":"Qual grupo apresenta concordância nominal na norma-padrão?","options":["Os menina atentos","As meninas atentas","As menina atenta","A meninas atento"],"answer":1,"hint":"Artigo, substantivo e adjetivo devem se relacionar em gênero e número.","feedback":"“As meninas atentas” tem todos os elementos no feminino plural. A concordância liga os determinantes e os modificadores ao substantivo."},
+    {"id":"6-S7","grade":6,"topic":"Sintaxe","skill":"EF06LP08","prompt":"Em “A turma vai apresentar o trabalho”, “vai apresentar” funciona como:","options":["Duas orações","Uma locução verbal","Um substantivo","Uma pergunta"],"answer":1,"hint":"Duas formas verbais podem apresentar juntas uma mesma ação.","feedback":"“Vai apresentar” é uma locução verbal: as duas formas organizam um único núcleo verbal. Esse período tem apenas uma oração."},
+    {"id":"6-S8","grade":6,"topic":"Sintaxe","skill":"EF06LP09","prompt":"Qual alternativa contém um período simples?","options":["Lia leu e comentou.","Quando choveu, saí.","O poeta chegou cedo.","Estudei, mas esqueci."],"answer":2,"hint":"Procure a alternativa com apenas um núcleo verbal.","feedback":"“O poeta chegou cedo” tem somente o núcleo verbal “chegou”. As demais alternativas contêm dois verbos que organizam duas orações."},
+    {"id":"6-O1","grade":6,"topic":"Ortografia","skill":"EF67LP32","prompt":"Complete: “Quero ler ___ um capítulo antes de dormir.”","options":["mais","mas","maiz","más"],"answer":0,"hint":"A frase indica uma quantidade adicional, sem oposição.","feedback":"“Mais” indica acréscimo ou quantidade. “Mas” geralmente liga ideias em oposição: “Quero ler, mas estou com sono”."},
+    {"id":"6-O2","grade":6,"topic":"Ortografia","skill":"EF67LP32","prompt":"Complete: “Nossa ___ à biblioteca foi inesquecível.”","options":["viajem","viagem","viagen","viajém"],"answer":1,"hint":"Nesse trecho, a palavra dá nome ao passeio; não é uma ação verbal.","feedback":"“Viagem”, com g, é substantivo e nomeia o passeio. “Viajem”, com j, é uma forma do verbo viajar: “Espero que eles viajem amanhã”."},
+    {"id":"6-O3","grade":6,"topic":"Ortografia","skill":"EF67LP32","prompt":"Qual escrita completa “O menino ___ o portão antes de sair”?","options":["fechou","fexou","feixou","féchou"],"answer":0,"hint":"A palavra vem do verbo fechar.","feedback":"“Fechou” é a grafia convencional dessa forma de fechar. O som de “ch” também pode ser representado por “x” em outras palavras, por isso é preciso conhecer a escrita."},
+    {"id":"6-O4","grade":6,"topic":"Ortografia","skill":"EF67LP32","prompt":"Complete: “Ao lado do museu havia uma ___ muito antiga.”","options":["caza","cassa","casa","cáza"],"answer":2,"hint":"Entre vogais, um único “s” pode representar o som de “z”.","feedback":"“Casa” se escreve com um “s”, que entre vogais representa aqui o som de “z”. Escrever apenas pelo som pode produzir trocas ortográficas."},
+    {"id":"6-O5","grade":6,"topic":"Ortografia","skill":"EF67LP32","prompt":"Qual palavra está escrita conforme a convenção ortográfica?","options":["conhesimento","conhecimento","conhecimemto","conhesimemto"],"answer":1,"hint":"Observe a base ligada ao verbo conhecer e a terminação da palavra.","feedback":"“Conhecimento” é a escrita convencional. Ele se relaciona ao verbo conhecer; notar famílias de palavras pode ajudar a revisar a ortografia."},
+    {"id":"6-O6","grade":6,"topic":"Ortografia","skill":"EF67LP32","prompt":"Complete: “Os alunos ___ desenhos para a exposição.”","options":["fiseram","fizeram","fizéram","fisseram"],"answer":1,"hint":"A forma verbal se relaciona ao verbo fazer.","feedback":"“Fizeram”, com “z”, é uma forma do verbo fazer. Não recebe acento gráfico; o contexto e a família de palavras ajudam na revisão."},
+    {"id":"6-O7","grade":6,"topic":"Ortografia","skill":"EF67LP32","prompt":"Qual palavra completa “O ___ do relógio interrompeu a leitura”?","options":["barulho","barulio","barrulho","barulhu"],"answer":0,"hint":"A grafia conserva o dígrafo “lh”.","feedback":"“Barulho” é a grafia convencional. “Lh” representa um som específico; não deve ser substituído por “li” nesse vocábulo."},
+    {"id":"6-O8","grade":6,"topic":"Ortografia","skill":"EF67LP32","prompt":"Complete: “A menina trouxe ___ para escrever no cartaz.”","options":["canéta","caneta","canneta","kanêta"],"answer":1,"hint":"Considere a grafia usual e a necessidade de acento.","feedback":"“Caneta” é uma palavra paroxítona terminada em “a” e não recebe acento gráfico. A letra inicial convencional é “c”, e não “k”."},
+    {"id":"6-L1","grade":6,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"Microcrônica: “Na feira de Itu, comprei um tomate. Cheguei em casa contando a aventura.” O narrador:","options":["Participa da história","Só observa de fora","É o tomate","Não aparece no texto"],"answer":0,"hint":"Observe as formas “comprei” e “cheguei”.","feedback":"O narrador participa dos acontecimentos e fala em primeira pessoa. Narrador é a voz criada no texto; ele não precisa ser a mesma pessoa que o autor."},
+    {"id":"6-L2","grade":6,"topic":"Literatura Brasileira","skill":"EF69LP44","prompt":"Gonçalves Dias: “Minha terra tem palmeiras, / Onde canta o Sabiá”. A expressão “minha terra” sugere:","options":["Indiferença ao lugar","Ligação afetiva com a terra natal","Uma regra científica","Uma compra de terreno"],"answer":1,"hint":"Relacione a voz do poema à imagem de um lugar querido.","feedback":"Em “Canção do Exílio”, a natureza da terra natal é evocada com afeto e saudade. A voz que se expressa em um poema é chamada de eu lírico."},
+    {"id":"6-L3","grade":6,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"Fábula autoral: uma onça e um macaco discutem e aprendem a dividir a água. A humanização dos animais é:","options":["Comum nas fábulas","Uma regra científica","Um manual de caça","Uma notícia real"],"answer":0,"hint":"Os animais agem como pessoas para construir uma reflexão.","feedback":"É comum que fábulas atribuam comportamentos humanos a animais. O conflito pode levar a uma reflexão sobre atitudes, como a divisão de recursos."},
+    {"id":"6-L4","grade":6,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"Conto: “Quando a luz acabou, Joana precisou encontrar a saída.” O apagão introduz principalmente:","options":["Uma lista de compras","Um conflito","Uma receita","A assinatura do autor"],"answer":1,"hint":"Observe qual acontecimento cria um problema para a personagem.","feedback":"O apagão cria o conflito: Joana enfrenta uma dificuldade que move a narrativa. A história pode mostrar suas tentativas de resolver esse problema."},
+    {"id":"6-L5","grade":6,"topic":"Literatura Brasileira","skill":"EF69LP44","prompt":"Cordel autoral: “Na feira do meu lugar / cada voz tem seu saber”. Que valor os versos sugerem?","options":["Só uma voz importa","Saberes diversos","Proibir a conversa","Esquecer a feira"],"answer":1,"hint":"A expressão “cada voz” dá espaço a mais de uma experiência.","feedback":"Os versos valorizam diferentes saberes da comunidade. A literatura pode destacar experiências e formas de conhecimento que convivem em um mesmo lugar."},
+    {"id":"6-L6","grade":6,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"No conto “A carta perdida”, o título chama atenção para um objeto que pode:","options":["Organizar o enredo","Substituir todo leitor","Eliminar personagens","Virar regra gramatical"],"answer":0,"hint":"Um objeto pode desencadear a busca e o conflito de uma história.","feedback":"Uma carta perdida pode motivar as ações das personagens e organizar o enredo. O título oferece uma pista, mas a leitura precisa confirmar como o objeto aparece."},
+    {"id":"6-L7","grade":6,"topic":"Literatura Brasileira","skill":"EF67LP38","prompt":"Verso autoral: “A cidade acordou sorrindo”. A imagem atribui à cidade:","options":["Só um endereço","Uma ação humana","Um cálculo exato","Uma ordem ao leitor"],"answer":1,"hint":"Acordar sorrindo é uma ação de pessoa atribuída a um lugar.","feedback":"Há personificação. A cidade recebe uma ação humana, criando uma imagem poética de um lugar alegre ou cheio de vida."},
+    {"id":"6-L8","grade":6,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"“Depois da chuva, os amigos voltaram à praça.” A expressão inicial indica principalmente:","options":["Uma personagem","Uma marca de tempo","O autor do conto","Um objeto mágico"],"answer":1,"hint":"A expressão ajuda a situar o momento do acontecimento.","feedback":"“Depois da chuva” localiza temporalmente a ação e ajuda a construir a sequência narrativa. Marcas de tempo orientam o leitor na organização dos acontecimentos."},
+    {"id":"7-M1","grade":7,"topic":"Morfologia","skill":"EF67LP34","prompt":"Em “infeliz”, o prefixo “in-” acrescenta à palavra “feliz” uma ideia de:","options":["Aumento","Negação","Tempo","Repetição"],"answer":1,"hint":"Compare o sentido da palavra antes e depois do prefixo.","feedback":"O prefixo “in-” expressa negação e forma um antônimo: “infeliz” se opõe a “feliz”. Prefixos são elementos acrescentados antes da base de uma palavra."},
+    {"id":"7-M2","grade":7,"topic":"Morfologia","skill":"EF07LP09","prompt":"Em “Marina leu silenciosamente”, “silenciosamente” indica:","options":["O lugar da leitura","O nome do livro","O modo de ler","A pessoa que leu"],"answer":2,"hint":"Pergunte ao verbo: de que maneira Marina leu?","feedback":"“Silenciosamente” é um advérbio de modo. Ele modifica o verbo “leu”, acrescentando como a ação aconteceu."},
+    {"id":"7-M3","grade":7,"topic":"Morfologia","skill":"EF07LP03","prompt":"Em “reler”, o prefixo “re-” indica:","options":["Ler novamente","Ler sem livro","Deixar de ler","Ler no passado"],"answer":0,"hint":"Compare ler e reler.","feedback":"Nesse contexto, o prefixo “re-” acrescenta a ideia de repetição: reler é ler novamente. O valor de um prefixo deve ser observado na palavra e no contexto."},
+    {"id":"7-M4","grade":7,"topic":"Morfologia","skill":"EF67LP35","prompt":"“Livraria”, formada de “livro” com acréscimo de sufixo, resulta de:","options":["Composição","Derivação","Uma oração","Uma abreviação"],"answer":1,"hint":"Uma base recebe um elemento novo ao final.","feedback":"Há derivação sufixal: a base se relaciona a livro e recebe um sufixo. Na composição, duas ou mais bases participam da formação de uma palavra."},
+    {"id":"7-M5","grade":7,"topic":"Morfologia","skill":"EF07LP09","prompt":"Em “A turma ensaiou ontem”, “ontem” acrescenta ao verbo uma circunstância de:","options":["Tempo","Lugar","Modo","Negação"],"answer":0,"hint":"A palavra responde à pergunta “quando?”.","feedback":"“Ontem” é um advérbio de tempo e localiza a ação de ensaiar. Não indica como nem onde o ensaio aconteceu."},
+    {"id":"7-M6","grade":7,"topic":"Morfologia","skill":"EF07LP08","prompt":"Em “O rapaz paciente ouviu o colega”, “paciente” caracteriza:","options":["A ação de ouvir","O substantivo rapaz","A palavra colega","Uma quantidade"],"answer":1,"hint":"Procure o substantivo diretamente modificado pelo adjetivo.","feedback":"“Paciente” é um adjetivo ligado a “rapaz”. Ele amplia a caracterização do sujeito e ajuda a construir o sentido do trecho."},
+    {"id":"7-M7","grade":7,"topic":"Morfologia","skill":"EF07LP09","prompt":"Em “Ela leu com atenção”, o trecho “com atenção” funciona como:","options":["Locução adverbial","Sujeito da oração","Nome de personagem","Verbo de ligação"],"answer":0,"hint":"O grupo de palavras indica de que maneira ela leu.","feedback":"“Com atenção” é uma locução adverbial de modo. Várias palavras desempenham juntas a função de acrescentar uma circunstância à ação."},
+    {"id":"7-M8","grade":7,"topic":"Morfologia","skill":"EF67LP34","prompt":"Qual palavra apresenta oposição de sentido a “possível” pela presença de prefixo?","options":["possibilidade","impossível","possivelmente","possibilitar"],"answer":1,"hint":"Procure a palavra que nega a possibilidade.","feedback":"“Impossível” opõe-se a “possível”. Nesse caso, o prefixo aparece como “im-” antes de “p” e expressa negação."},
+    {"id":"7-S1","grade":7,"topic":"Sintaxe","skill":"EF07LP07","prompt":"Em “Pedro guardou o caderno”, o trecho “o caderno” exerce a função de:","options":["Sujeito","Objeto direto","Vocativo","Verbo"],"answer":1,"hint":"Pergunte: Pedro guardou o quê? O complemento aparece sem preposição exigida.","feedback":"“O caderno” é objeto direto: completa o sentido de “guardou” sem preposição exigida pelo verbo. “Pedro” é o sujeito."},
+    {"id":"7-S2","grade":7,"topic":"Sintaxe","skill":"EF07LP11","prompt":"Em “Queria sair, mas começou a chover”, a palavra “mas” estabelece:","options":["Soma","Explicação do termo anterior","Oposição","Ordem cronológica apenas"],"answer":2,"hint":"A segunda ideia contraria a expectativa criada pela primeira.","feedback":"“Mas” é uma conjunção adversativa e estabelece oposição. O desejo de sair encontra uma situação que dificulta sua realização."},
+    {"id":"7-S3","grade":7,"topic":"Sintaxe","skill":"EF07LP07","prompt":"Em “Os estudantes apresentaram o poema”, qual é o sujeito?","options":["o poema","apresentaram","Os estudantes","o"],"answer":2,"hint":"Pergunte quem realizou a apresentação.","feedback":"“Os estudantes” é o sujeito e “estudantes” é seu núcleo. “O poema” completa o verbo apresentar como objeto direto."},
+    {"id":"7-S4","grade":7,"topic":"Sintaxe","skill":"EF07LP07","prompt":"Em “Lia gosta de poemas”, “de poemas” é:","options":["Objeto indireto","Sujeito","Vocativo","Predicado inteiro"],"answer":0,"hint":"O complemento liga-se a gostar com a preposição “de”.","feedback":"“De poemas” é objeto indireto, pois completa gostar com uma preposição exigida nesse uso. O sujeito da oração é Lia."},
+    {"id":"7-S5","grade":7,"topic":"Sintaxe","skill":"EF07LP11","prompt":"Em “A turma leu o conto e comentou o final”, “e” liga ideias de:","options":["Adição","Oposição","Condição","Negação"],"answer":0,"hint":"Uma ação é acrescentada à outra.","feedback":"A conjunção “e” estabelece adição entre ler e comentar. Ela conecta duas orações sem criar oposição entre essas ações."},
+    {"id":"7-S6","grade":7,"topic":"Sintaxe","skill":"EF07LP11","prompt":"Qual palavra conserva a oposição em “O livro é curto, ___ exige atenção”?","options":["e","porém","porque","quando"],"answer":1,"hint":"A segunda oração contraria a expectativa ligada a um livro curto.","feedback":"“Porém” é uma conjunção adversativa. Ela conserva a oposição entre a pequena extensão do livro e a atenção necessária para lê-lo."},
+    {"id":"7-S7","grade":7,"topic":"Sintaxe","skill":"EF07LP07","prompt":"Em “A professora explicou a atividade”, o predicado é:","options":["A professora","a atividade","explicou a atividade","professora"],"answer":2,"hint":"O predicado apresenta o que se diz sobre o sujeito.","feedback":"“Explicou a atividade” é o predicado. Ele inclui o verbo explicou e seu complemento; o sujeito é “A professora”."},
+    {"id":"7-S8","grade":7,"topic":"Sintaxe","skill":"EF07LP07","prompt":"Em “O leitor encontrou uma pista”, “uma pista” completa o verbo:","options":["Sem preposição","Como sujeito","Como vocativo","Sem relação de sentido"],"answer":0,"hint":"Pergunte: encontrou o quê?","feedback":"“Uma pista” completa encontrar sem preposição exigida pelo verbo e funciona como objeto direto. Ela indica o que foi encontrado."},
+    {"id":"7-O1","grade":7,"topic":"Ortografia","skill":"EF67LP32","prompt":"Complete: “Li o conto, ___ ainda preciso revisar o final.”","options":["mais","más","mas","maiz"],"answer":2,"hint":"Aqui não se fala de quantidade: uma ressalva acompanha a primeira ideia.","feedback":"“Mas” introduz uma ressalva ou oposição. “Mais” indica quantidade ou acréscimo e não desempenha essa função no trecho."},
+    {"id":"7-O2","grade":7,"topic":"Ortografia","skill":"EF67LP32","prompt":"Qual forma completa a pergunta “___ você voltou à biblioteca?”","options":["Porque","Porquê","Por que","Por quê"],"answer":2,"hint":"A pergunta começa pedindo o motivo da volta.","feedback":"“Por que”, separado e sem acento, equivale aqui a “por qual motivo”. No final de uma pergunta, usa-se “por quê”: “Você voltou por quê?”."},
+    {"id":"7-O3","grade":7,"topic":"Ortografia","skill":"EF67LP32","prompt":"Complete: “O personagem agiu ___ ao esconder a verdade.”","options":["mau","mal","máu","mall"],"answer":1,"hint":"A lacuna modifica a ação; o contrário adequado é “bem”.","feedback":"“Mal” é advérbio e se opõe aqui a “bem”. “Mau” é adjetivo e costuma opor-se a “bom”, como em “um mau conselho”."},
+    {"id":"7-O4","grade":7,"topic":"Ortografia","skill":"EF67LP32","prompt":"Complete: “O ___ conselho confundiu o viajante.”","options":["mal","mau","máu","mall"],"answer":1,"hint":"A palavra caracteriza conselho; compare com “bom conselho”.","feedback":"“Mau” é o adjetivo que caracteriza conselho. O contraste com bom ajuda a distinguir essa palavra de mal, frequentemente oposta a bem."},
+    {"id":"7-O5","grade":7,"topic":"Ortografia","skill":"EF67LP32","prompt":"Complete: “Não fui ao sarau ___ fiquei doente.”","options":["porquê","por quê","porque","por que"],"answer":2,"hint":"O trecho apresenta a razão da ausência.","feedback":"“Porque”, junto e sem acento, introduz a explicação da ausência. A frase não pede um motivo nem usa porquê como substantivo."},
+    {"id":"7-O6","grade":7,"topic":"Ortografia","skill":"EF67LP32","prompt":"Complete a pergunta: “Você interrompeu a leitura ___?”","options":["porque","por quê","porquê","por que"],"answer":1,"hint":"A expressão está no final da pergunta, antes do sinal de interrogação.","feedback":"No final de uma pergunta, usa-se “por quê”, separado e com acento. Aqui a expressão equivale a “por qual motivo”."},
+    {"id":"7-O7","grade":7,"topic":"Ortografia","skill":"EF67LP33","prompt":"Qual pontuação marca melhor o chamamento na frase dirigida a Ana?","options":["Ana venha ler.","Ana, venha ler.","Ana venha, ler.","Ana venha ler,"],"answer":1,"hint":"O nome usado para chamar alguém é separado por vírgula.","feedback":"“Ana, venha ler” separa o vocativo Ana por vírgula. O vocativo chama a pessoa com quem se fala e não funciona como sujeito do imperativo."},
+    {"id":"7-O8","grade":7,"topic":"Ortografia","skill":"EF67LP32","prompt":"Em qual alternativa todas as palavras estão grafadas corretamente?","options":["pesquiza e livro","pesquisa e livro","pesquisa e livru","pesquiza e livru"],"answer":1,"hint":"Revise a palavra relacionada a pesquisar e o substantivo livro.","feedback":"A grafia convencional é “pesquisa e livro”. Pesquisa se escreve com s, e livro termina com o, mesmo quando a pronúncia final se aproxima de u."},
+    {"id":"7-L1","grade":7,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"Conto: “José abriu a porta do casarão. Não sabia que um bilhete o esperava.” A história é narrada:","options":["Pelo próprio José","Em terceira pessoa","Pelo bilhete em primeira pessoa","Sem narrador"],"answer":1,"hint":"A voz usa o nome da personagem, em vez de contar “eu abri”.","feedback":"A narrativa está em terceira pessoa. A voz fala sobre José e conhece sua falta de informação. Foco narrativo ajuda a definir o que o leitor sabe."},
+    {"id":"7-L2","grade":7,"topic":"Literatura Brasileira","skill":"EF67LP38","prompt":"Verso autoral sobre a Amazônia: “O rio conversava baixinho com o pescador”. Que recurso aparece?","options":["Personificação","Enumeração","Linguagem só literal","Definição de dicionário"],"answer":0,"hint":"Uma ação humana foi atribuída a um elemento da natureza.","feedback":"Há personificação: conversar é uma ação humana atribuída ao rio. A imagem aproxima o leitor da natureza e produz um efeito poético."},
+    {"id":"7-L3","grade":7,"topic":"Literatura Brasileira","skill":"EF67LP38","prompt":"“Seu sorriso era uma janela para o dia.” O verso autoral constrói:","options":["Uma metáfora","Uma ordem","Um dado científico","Uma receita"],"answer":0,"hint":"A imagem aproxima sorriso e janela sem usar “como”.","feedback":"Há metáfora: a imagem de janela é transferida ao sorriso, sugerindo abertura, luz ou esperança. O sentido figurado depende da relação construída pelo texto."},
+    {"id":"7-L4","grade":7,"topic":"Literatura Brasileira","skill":"EF67LP38","prompt":"“A notícia correu como vento pelas ruas.” A presença de “como” introduz:","options":["Uma comparação","Uma proibição","Um vocativo","Uma data"],"answer":0,"hint":"Observe a aproximação entre a velocidade da notícia e a do vento.","feedback":"Há comparação entre a circulação da notícia e o vento. A palavra como explicita a aproximação e destaca a rapidez sugerida pela imagem."},
+    {"id":"7-L5","grade":7,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"No conto, a narradora conta o que fez e admite não saber o que seu amigo pensava. Isso mostra:","options":["Uma voz sem limites","Um saber limitado","Ausência de narrador","Um manual técnico"],"answer":1,"hint":"A voz participa dos fatos, mas não acessa automaticamente a mente de outra pessoa.","feedback":"O trecho mostra limites do conhecimento da narradora. Narrar em primeira pessoa não dá acesso obrigatório aos pensamentos das demais personagens."},
+    {"id":"7-L6","grade":7,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"“— Você encontrou a carta? — perguntou Cora.” O uso de travessão sinaliza:","options":["Discurso direto","Uma lista numérica","Uma data antiga","Uma regra ortográfica"],"answer":0,"hint":"A fala de uma personagem é apresentada diretamente ao leitor.","feedback":"O trecho apresenta discurso direto: a fala de Cora aparece como enunciado da personagem. O verbo perguntou ajuda a identificar quem fala."},
+    {"id":"7-L7","grade":7,"topic":"Literatura Brasileira","skill":"EF69LP44","prompt":"Um cordel celebra feirantes e artesãos do bairro. Ao analisar seus valores, convém observar:","options":["Só o preço do papel","As vozes valorizadas","Só o número de letras","Nenhuma marca cultural"],"answer":1,"hint":"Pergunte quais pessoas e experiências recebem destaque no poema.","feedback":"A leitura pode investigar quais vozes e experiências o cordel valoriza. Textos literários oferecem perspectivas sobre comunidades, identidades e modos de viver."},
+    {"id":"7-L8","grade":7,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"No conto, a descoberta de quem escondeu a chave resolve a busca. Esse momento é o:","options":["Título","Desfecho","Autor","Vocativo"],"answer":1,"hint":"A dificuldade central da narrativa encontra uma resolução.","feedback":"Esse momento funciona como desfecho, ao resolver a busca que organizava o conflito. Um final também pode deixar questões abertas, conforme a proposta do texto."},
+    {"id":"8-M1","grade":8,"topic":"Morfologia","skill":"EF08LP05","prompt":"“Planalto” resulta da união de “plano” e “alto”, com alteração sonora. Esse processo é:","options":["Derivação prefixal","Composição por aglutinação","Abreviação","Composição por justaposição"],"answer":1,"hint":"Verifique se as palavras originais conservaram integralmente sua forma.","feedback":"“Planalto” é formado por aglutinação: “plano” e “alto” se unem com perda ou alteração de sons. Na justaposição, as formas se mantêm, como em “guarda-chuva”."},
+    {"id":"8-M2","grade":8,"topic":"Morfologia","skill":"EF08LP08","prompt":"Em “Os livros foram lidos pelos alunos”, o sujeito “os livros”:","options":["Pratica a ação de ler","Recebe a ação de ler","É um vocativo","Não se liga ao verbo"],"answer":1,"hint":"Quem realiza a leitura é indicado por “pelos alunos”.","feedback":"A oração está na voz passiva: “os livros” recebe a ação. “Pelos alunos” indica o agente da passiva, isto é, quem realizou a leitura."},
+    {"id":"8-M3","grade":8,"topic":"Morfologia","skill":"EF08LP05","prompt":"“Guarda-chuva” mantém as formas das palavras que o compõem. Há composição por:","options":["Aglutinação","Justaposição","Derivação prefixal","Abreviação"],"answer":1,"hint":"As bases se unem sem perder sua forma sonora nesse processo.","feedback":"A palavra é formada por justaposição: guarda e chuva conservam suas formas. O hífen não é, sozinho, o critério que diferencia os processos de composição."},
+    {"id":"8-M4","grade":8,"topic":"Morfologia","skill":"EF08LP05","prompt":"Em “aguardente”, água e ardente se unem com alteração sonora. O processo é:","options":["Justaposição","Aglutinação","Uma locução verbal","Uma abreviação"],"answer":1,"hint":"Compare a forma resultante com as duas palavras de origem.","feedback":"Aguardente resulta de aglutinação, pois a união de água e ardente envolve alteração sonora. Não basta contar as bases; é preciso observar como elas se unem."},
+    {"id":"8-M5","grade":8,"topic":"Morfologia","skill":"EF08LP08","prompt":"Qual frase coloca a turma como agente da ação na voz ativa?","options":["O poema foi lido.","A turma leu o poema.","O poema foi guardado.","A carta foi escrita."],"answer":1,"hint":"Procure um sujeito que realiza a ação de ler.","feedback":"“A turma leu o poema” está na voz ativa: turma é o sujeito agente. Nas outras alternativas, os sujeitos apresentados recebem as ações."},
+    {"id":"8-M6","grade":8,"topic":"Morfologia","skill":"EF08LP08","prompt":"Na frase “A carta foi escrita por Lia”, “por Lia” indica:","options":["Agente da passiva","Sujeito paciente","Uma data","Um lugar"],"answer":0,"hint":"Identifique quem realiza a ação na construção passiva.","feedback":"“Por Lia” é o agente da passiva: indica quem escreveu a carta. O sujeito paciente dessa oração é “A carta”."},
+    {"id":"8-M7","grade":8,"topic":"Morfologia","skill":"EF08LP09","prompt":"Em “Os novos livros chegaram”, “novos” modifica:","options":["O verbo chegaram","O nome livros","O artigo os","Um advérbio"],"answer":1,"hint":"A característica é atribuída a algo que chegou.","feedback":"Novos é um adjetivo que modifica livros, núcleo do sujeito. Ele amplia a caracterização do substantivo e participa da construção do sentido do grupo nominal."},
+    {"id":"8-M8","grade":8,"topic":"Morfologia","skill":"EF08LP09","prompt":"Em “um livro de aventuras”, “de aventuras” acrescenta ao substantivo uma indicação de:","options":["Tema ou tipo","Tempo da ação","Número de leitores","Pessoa verbal"],"answer":0,"hint":"O trecho ajuda a caracterizar que livro está sendo mencionado.","feedback":"A expressão caracteriza livro pelo seu tema ou tipo. Um substantivo pode ser modificado por grupos de palavras, não apenas por adjetivos isolados."},
+    {"id":"8-S1","grade":8,"topic":"Sintaxe","skill":"EF08LP07","prompt":"Em “A turma precisa de livros”, o trecho “de livros” é:","options":["Objeto direto","Objeto indireto","Sujeito simples","Aposto"],"answer":1,"hint":"Neste uso, o verbo precisar exige a preposição “de”.","feedback":"“De livros” é objeto indireto, pois completa o verbo com preposição exigida. Compare com “A turma comprou livros”, em que “livros” é objeto direto."},
+    {"id":"8-S2","grade":8,"topic":"Sintaxe","skill":"EF08LP06","prompt":"Em “A biblioteca pública recebeu visitantes”, qual é o núcleo do sujeito?","options":["pública","recebeu","visitantes","biblioteca"],"answer":3,"hint":"Localize de quem se fala e retire seus determinantes e modificadores.","feedback":"O sujeito é “A biblioteca pública” e seu núcleo é “biblioteca”. O artigo “A” e o adjetivo “pública” modificam esse substantivo."},
+    {"id":"8-S3","grade":8,"topic":"Sintaxe","skill":"EF08LP07","prompt":"Em “Cora entregou o livro ao colega”, “ao colega” é:","options":["Objeto indireto","Objeto direto","Sujeito","Aposto"],"answer":0,"hint":"Pergunte a quem o livro foi entregue e observe a preposição.","feedback":"“Ao colega” é objeto indireto, ligado ao verbo entregar pela preposição a. “O livro” é o objeto direto: indica o que foi entregue."},
+    {"id":"8-S4","grade":8,"topic":"Sintaxe","skill":"EF08LP06","prompt":"Em “Os livros da escola chegaram”, qual é o núcleo do sujeito?","options":["escola","chegaram","livros","da"],"answer":2,"hint":"O núcleo é o nome central do grupo, e não seu modificador.","feedback":"O núcleo é livros. O artigo os e a expressão da escola determinam ou modificam esse nome dentro do sujeito “Os livros da escola”."},
+    {"id":"8-S5","grade":8,"topic":"Sintaxe","skill":"EF08LP11","prompt":"“A turma leu e debateu.” A ligação entre as duas orações é de:","options":["Coordenação","Uma única palavra","Ausência de verbos","Substantivação"],"answer":0,"hint":"As duas ações são ligadas sem que uma oração funcione como termo da outra.","feedback":"As orações se ligam por coordenação, com a conjunção e. Há dois núcleos verbais: leu e debateu. A segunda oração tem sujeito recuperável pelo contexto."},
+    {"id":"8-S6","grade":8,"topic":"Sintaxe","skill":"EF08LP12","prompt":"“Quando o sinal tocou, a turma saiu.” A oração inicial acrescenta uma relação de:","options":["Tempo","Finalidade","Comparação","Oposição"],"answer":0,"hint":"A conjunção localiza o momento da saída.","feedback":"“Quando o sinal tocou” estabelece uma circunstância temporal para a oração principal. O trecho situa quando aconteceu a saída da turma."},
+    {"id":"8-S7","grade":8,"topic":"Sintaxe","skill":"EF08LP06","prompt":"Em “A turma estudou na biblioteca”, “na biblioteca” acrescenta uma circunstância de:","options":["Lugar","Pessoa","Objeto lido","Quantidade"],"answer":0,"hint":"Pergunte onde a turma estudou.","feedback":"Na biblioteca indica lugar e funciona como adjunto adverbial. Não é objeto: esse trecho situa a ação de estudar, em vez de nomear o que foi estudado."},
+    {"id":"8-S8","grade":8,"topic":"Sintaxe","skill":"EF08LP07","prompt":"Em “O leitor encontrou a resposta”, qual termo é o objeto direto?","options":["O leitor","encontrou","a resposta","resposta ao leitor"],"answer":2,"hint":"Pergunte ao verbo: encontrou o quê?","feedback":"“A resposta” é objeto direto de encontrou. O leitor é o sujeito; resposta indica o que foi encontrado, sem preposição exigida pelo verbo."},
+    {"id":"8-O1","grade":8,"topic":"Ortografia","skill":"EF08LP04","prompt":"Complete: “Ninguém explicou o ___ do atraso.”","options":["por que","porque","porquê","por quê"],"answer":2,"hint":"Depois do artigo “o”, a palavra funciona como um substantivo: o motivo.","feedback":"“Porquê”, junto e com acento, é substantivo e significa motivo. Pode vir com artigo e ser pluralizado: “os porquês”."},
+    {"id":"8-O2","grade":8,"topic":"Ortografia","skill":"EF08LP04","prompt":"Complete: “Ela ___ os livros na mochila; o banco ficou para ___.”","options":["trás / traz","traz / trás","traz / traz","trás / trás"],"answer":1,"hint":"A primeira lacuna indica uma ação; a segunda, posição.","feedback":"“Traz” é forma do verbo trazer. “Trás” indica posição e aparece em expressões como “para trás” e “por trás”."},
+    {"id":"8-O3","grade":8,"topic":"Ortografia","skill":"EF08LP04","prompt":"Complete: “Os alunos ___ dúvidas, mas a professora ___ uma ideia.”","options":["tem / têm","têm / tem","têm / têm","tem / tem"],"answer":1,"hint":"Compare os sujeitos plural e singular do verbo ter.","feedback":"Têm, com acento circunflexo, corresponde ao sujeito plural os alunos. Tem, sem acento, corresponde ao sujeito singular a professora."},
+    {"id":"8-O4","grade":8,"topic":"Ortografia","skill":"EF08LP04","prompt":"Na norma-padrão, qual frase concorda adequadamente com o sujeito plural?","options":["As cartas chegou.","As cartas chegaram.","As carta chegaram.","A cartas chegou."],"answer":1,"hint":"Observe o número do núcleo cartas e a forma do verbo.","feedback":"“As cartas chegaram” faz concordância nominal e verbal no plural. Na revisão, compare o núcleo do sujeito com o verbo, mesmo quando houver termos entre eles."},
+    {"id":"8-O5","grade":8,"topic":"Ortografia","skill":"EF08LP04","prompt":"Complete: “A turma fez uma ___ do trecho para citar no trabalho.”","options":["transcrição","transcrissão","tranzcrição","transcrisção"],"answer":0,"hint":"A palavra vem de transcrever e tem grafia convencional com “ç”.","feedback":"Transcrição é a grafia convencional. Relacionar a palavra a transcrever ajuda a reconhecer sua família, mas algumas formas precisam de consulta e memorização."},
+    {"id":"8-O6","grade":8,"topic":"Ortografia","skill":"EF08LP04","prompt":"Qual frase indica corretamente uma explicação de motivo?","options":["Saí porquê choveu.","Saí porque choveu.","Saí por que choveu.","Saí por quê choveu."],"answer":1,"hint":"A segunda oração apresenta a causa da saída.","feedback":"Porque, junto e sem acento, introduz aqui uma explicação de causa. As outras formas dos porquês têm usos diferentes conforme a função no enunciado."},
+    {"id":"8-O7","grade":8,"topic":"Ortografia","skill":"EF08LP04","prompt":"Complete: “A descrição trouxe ___ sobre a personagem.”","options":["detalhes","detálhes","detalhesz","detalis"],"answer":0,"hint":"Observe a escrita do plural de detalhe.","feedback":"A forma convencional é detalhes, plural de detalhe. A palavra não recebe acento gráfico e conserva o grupo lh da forma singular."},
+    {"id":"8-O8","grade":8,"topic":"Ortografia","skill":"EF08LP04","prompt":"Qual pontuação evita separar o sujeito de seu verbo?","options":["A turma, leu o conto.","A turma leu o conto.","A, turma leu o conto.","A turma leu, o conto."],"answer":1,"hint":"Nesse enunciado curto, sujeito e verbo se ligam diretamente.","feedback":"“A turma leu o conto” não usa vírgula entre sujeito e verbo nem entre o verbo e seu objeto direto. Vírgulas devem corresponder à estrutura e aos efeitos de sentido."},
+    {"id":"8-L1","grade":8,"topic":"Literatura Brasileira","skill":"EF89LP33","prompt":"Um texto breve transforma um atraso no ônibus de Itu em uma reflexão bem-humorada sobre a rotina. Esse perfil é típico de:","options":["Bula de remédio","Ata de reunião","Crônica","Manual técnico"],"answer":2,"hint":"Pense no gênero literário que encontra histórias no cotidiano.","feedback":"A crônica frequentemente parte de acontecimentos cotidianos e pode usar humor e reflexão. Um fato simples recebe um olhar pessoal e literário."},
+    {"id":"8-L2","grade":8,"topic":"Literatura Brasileira","skill":"EF69LP44","prompt":"Microconto: “No quintal, a avó contava histórias de sua comunidade. Os netos passaram a contá-las também.” O texto valoriza:","options":["O apagamento do passado","A memória entre gerações","O isolamento dos jovens","A proibição de narrar"],"answer":1,"hint":"Observe o que passa da avó aos netos e continua vivo.","feedback":"O texto valoriza a transmissão de memórias e saberes. Na literatura brasileira, diferentes comunidades e tradições podem preservar e recriar suas histórias."},
+    {"id":"8-L3","grade":8,"topic":"Literatura Brasileira","skill":"EF89LP33","prompt":"Miniconto: “O bilhete dizia adeus. No verso, alguém escrevera: volto amanhã.” O contraste sugere:","options":["Um sentido a investigar","Uma conta matemática","Só um endereço","Um manual de instruções"],"answer":0,"hint":"Compare a despedida com a promessa escrita no verso.","feedback":"O contraste cria uma tensão que pede interpretação: a despedida pode não ser definitiva. Um miniconto pode construir sentidos com poucas informações e deixar lacunas ao leitor."},
+    {"id":"8-L4","grade":8,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"Uma narradora descreve o mesmo acidente de modo diferente de outra personagem. O leitor deve:","options":["Aceitar só a primeira","Comparar as perspectivas","Ignorar o contexto","Eliminar as duas vozes"],"answer":1,"hint":"Diferentes vozes podem perceber e contar um fato de formas distintas.","feedback":"Comparar as perspectivas ajuda a analisar o foco narrativo e as pistas do texto. Nenhuma versão deve ser aceita automaticamente apenas por aparecer primeiro."},
+    {"id":"8-L5","grade":8,"topic":"Literatura Brasileira","skill":"EF89LP33","prompt":"Uma crônica comenta a pressa na fila do pão e termina refletindo sobre ouvir o outro. Seu ponto de partida é:","options":["O cotidiano","Uma lei obrigatória","Uma tabela numérica","Um experimento científico"],"answer":0,"hint":"O gênero encontra uma reflexão em uma situação comum.","feedback":"A situação cotidiana funciona como ponto de partida para a reflexão literária. A crônica pode transformar experiências familiares por meio de humor, observação e linguagem expressiva."},
+    {"id":"8-L6","grade":8,"topic":"Literatura Brasileira","skill":"EF69LP44","prompt":"Um conto apresenta uma criança preservando a língua de sua família. A leitura pode investigar principalmente:","options":["Só a cor da capa","Identidade e memória","Só a ordem alfabética","Nenhum valor cultural"],"answer":1,"hint":"Observe o valor atribuído à língua e à história da família.","feedback":"O conto pode valorizar identidade, memória e transmissão cultural. Essa análise deve apoiar-se nas ações, nas falas e nas escolhas narrativas presentes no texto."},
+    {"id":"8-L7","grade":8,"topic":"Literatura Brasileira","skill":"EF89LP32","prompt":"Um conto retoma uma personagem de outra história, mas lhe dá um novo ponto de vista. Essa relação é:","options":["Intertextualidade","Uma regra de concordância","Ausência de diálogo","Só repetição de letras"],"answer":0,"hint":"A nova história conversa com uma narrativa anterior.","feedback":"Há intertextualidade: a retomada de uma personagem cria diálogo entre textos. A mudança de perspectiva pode questionar ou ampliar o sentido da narrativa anterior."},
+    {"id":"8-L8","grade":8,"topic":"Literatura Brasileira","skill":"EF89LP33","prompt":"Em um conto de suspense, o leitor recebe pistas incompletas antes da revelação. Esse recurso busca:","options":["Criar expectativa","Dar todas as respostas","Eliminar a leitura","Definir uma palavra"],"answer":0,"hint":"A falta parcial de informação envolve o leitor na busca.","feedback":"Pistas incompletas podem criar expectativa e suspense. O leitor formula hipóteses e as revê quando novas informações aparecem, sem confundir hipótese com prova."},
+    {"id":"9-M1","grade":9,"topic":"Morfologia","skill":"EF09LP08","prompt":"Em “Embora estivesse cansada, Ana terminou o conto”, “embora” introduz uma ideia de:","options":["Concessão","Finalidade","Adição","Tempo exato"],"answer":0,"hint":"Há uma dificuldade que não impede a realização da ação principal.","feedback":"“Embora” introduz uma concessão: o cansaço poderia dificultar a ação, mas Ana a realizou. É diferente de causa ou condição."},
+    {"id":"9-M2","grade":9,"topic":"Morfologia","skill":"EF09LP04","prompt":"Em “O cantar dos pássaros animou a leitura”, “cantar” funciona como:","options":["Adjetivo","Substantivo","Pronome","Conjunção"],"answer":1,"hint":"O artigo “o” transforma a ação em algo que pode ser nomeado.","feedback":"O infinitivo “cantar” foi substantivado: o artigo permite nomear a ação como “o cantar”. A classe de uma palavra deve ser analisada em seu contexto."},
+    {"id":"9-M3","grade":9,"topic":"Morfologia","skill":"EF09LP08","prompt":"Em “Se a chuva parar, faremos o sarau”, “se” introduz:","options":["Condição","Certeza concluída","Adição","Explicação nominal"],"answer":0,"hint":"O sarau depende de uma possibilidade apresentada antes.","feedback":"A conjunção se introduz uma condição. A realização do sarau depende do fim da chuva; não se afirma que essa condição já foi atendida."},
+    {"id":"9-M4","grade":9,"topic":"Morfologia","skill":"EF09LP08","prompt":"Em “Estudou para que pudesse explicar”, “para que” apresenta:","options":["Finalidade","Oposição","Tempo passado","Uma comparação"],"answer":0,"hint":"A segunda oração indica o objetivo do estudo.","feedback":"Para que introduz finalidade: explicar é o objetivo associado ao ato de estudar. Essa relação é diferente da causa que levou alguém a estudar."},
+    {"id":"9-M5","grade":9,"topic":"Morfologia","skill":"EF09LP08","prompt":"“Leu com atenção, portanto entendeu a pista.” A conjunção “portanto” indica:","options":["Conclusão","Contraste","Condição","Tempo exato"],"answer":0,"hint":"A segunda oração apresenta um resultado inferido a partir da primeira.","feedback":"Portanto estabelece uma relação conclusiva. Entender a pista é apresentado como conclusão ligada à leitura atenta, no encadeamento argumentativo do trecho."},
+    {"id":"9-M6","grade":9,"topic":"Morfologia","skill":"EF09LP08","prompt":"Em “Não só leu, mas também escreveu”, a expressão correlativa estabelece:","options":["Adição","Exclusão","Condição","Tempo"],"answer":0,"hint":"A segunda atividade soma-se à primeira.","feedback":"A construção não só... mas também é aditiva. Mesmo com a palavra mas, a expressão inteira acrescenta uma ação à outra; não basta classificar pela palavra isolada."},
+    {"id":"9-M7","grade":9,"topic":"Morfologia","skill":"EF09LP08","prompt":"“Como estava chovendo, o sarau mudou de lugar.” Nesse contexto, “como” expressa:","options":["Causa","Comparação","Uma ordem","Concessão"],"answer":0,"hint":"A chuva explica a mudança de lugar.","feedback":"Como tem valor causal nesse contexto: a chuva explica a mudança. A mesma palavra pode expressar comparação em outros trechos, por isso o contexto é decisivo."},
+    {"id":"9-M8","grade":9,"topic":"Morfologia","skill":"EF09LP08","prompt":"Em “Mesmo que seja difícil, tentarei”, a expressão “mesmo que” introduz:","options":["Concessão","Adição","Finalidade","Tempo definido"],"answer":0,"hint":"A dificuldade apresentada não impede a intenção de tentar.","feedback":"Mesmo que introduz uma relação concessiva. A possível dificuldade contrasta com a ação pretendida, mas não elimina a decisão de tentar."},
+    {"id":"9-S1","grade":9,"topic":"Sintaxe","skill":"EF09LP05","prompt":"Em “A leitura é transformadora”, “transformadora” é:","options":["Objeto direto","Adjunto adverbial","Predicativo do sujeito","Sujeito oculto"],"answer":2,"hint":"O verbo de ligação relaciona o sujeito a uma característica.","feedback":"“Transformadora” é predicativo do sujeito: atribui uma característica a “A leitura” por meio do verbo de ligação “é”."},
+    {"id":"9-S2","grade":9,"topic":"Sintaxe","skill":"EF09LP09","prompt":"Em “Os alunos que leram o conto debateram”, o trecho “que leram o conto”, sem vírgulas:","options":["Restringe quais alunos","Inclui todos os alunos","Indica o local do debate","É uma pergunta"],"answer":0,"hint":"A oração seleciona um grupo de alunos por uma característica.","feedback":"A oração adjetiva restritiva delimita o grupo: participaram os alunos que leram o conto. Com vírgulas, a oração explicativa acrescentaria uma informação sobre o conjunto."},
+    {"id":"9-S3","grade":9,"topic":"Sintaxe","skill":"EF09LP05","prompt":"Em “O poema parece misterioso”, “parece” funciona como:","options":["Verbo de ligação","Objeto direto","Sujeito composto","Aposto"],"answer":0,"hint":"O verbo liga o sujeito a uma característica percebida.","feedback":"Parece é verbo de ligação nesse uso. Ele relaciona O poema ao predicativo misterioso e apresenta essa característica como uma impressão."},
+    {"id":"9-S4","grade":9,"topic":"Sintaxe","skill":"EF09LP05","prompt":"Qual trecho contém predicativo do sujeito?","options":["A turma abriu a porta.","Lia ficou contente.","Cora trouxe um livro.","O leitor leu a carta."],"answer":1,"hint":"Procure a qualidade ligada ao sujeito por um verbo de ligação.","feedback":"Em “Lia ficou contente”, contente é predicativo do sujeito Lia. Ficou apresenta o estado alcançado; nas outras frases, os termos após os verbos são objetos."},
+    {"id":"9-S5","grade":9,"topic":"Sintaxe","skill":"EF09LP09","prompt":"Em “As cartas, que estavam molhadas, foram guardadas”, a oração entre vírgulas:","options":["Restringe um subgrupo","Explica as cartas citadas","Indica quem escreve","É uma pergunta direta"],"answer":1,"hint":"As vírgulas sinalizam uma informação acrescentada sobre o conjunto citado.","feedback":"A oração adjetiva explicativa acrescenta uma informação sobre as cartas mencionadas. Sem vírgulas, a oração restritiva selecionaria apenas as cartas molhadas."},
+    {"id":"9-S6","grade":9,"topic":"Sintaxe","skill":"EF09LP09","prompt":"Qual frase seleciona apenas um grupo de leitores, por meio de oração restritiva?","options":["Leitores que vieram leram.","Leitores, que vieram, leram.","Todos os leitores leram.","Os leitores estão aqui."],"answer":0,"hint":"A oração que caracteriza o grupo não é isolada por vírgulas.","feedback":"Em “Leitores que vieram leram”, a oração que vieram restringe o conjunto aos leitores que compareceram. A segunda alternativa apresenta uma oração explicativa."},
+    {"id":"9-S7","grade":9,"topic":"Sintaxe","skill":"EF09LP08","prompt":"“Embora houvesse silêncio, Lia não se concentrou.” A relação entre as orações é:","options":["Concessiva","Aditiva","Condicional","Comparativa"],"answer":0,"hint":"O silêncio não produziu o resultado que poderia ser esperado.","feedback":"A oração concessiva introduz uma circunstância que poderia favorecer a concentração, mas o resultado contraria essa expectativa. Embora marca essa relação."},
+    {"id":"9-S8","grade":9,"topic":"Sintaxe","skill":"EF09LP05","prompt":"Em “A resposta continua incompleta”, o termo “incompleta” se refere:","options":["Ao sujeito resposta","A um objeto direto","A uma data","Ao autor de todo texto"],"answer":0,"hint":"O verbo apresenta a permanência de um estado.","feedback":"Incompleta é predicativo do sujeito A resposta. Continua funciona como verbo de ligação nesse contexto e indica a manutenção desse estado."},
+    {"id":"9-O1","grade":9,"topic":"Ortografia","skill":"EF09LP04","prompt":"Qual frase indica corretamente um tempo já decorrido?","options":["A dois anos, li esse conto.","Há dois anos, li esse conto.","À dois anos, li esse conto.","Ah dois anos, li esse conto."],"answer":1,"hint":"Para indicar tempo passado, pense no verbo haver.","feedback":"“Há dois anos” indica tempo decorrido. “A” pode indicar tempo futuro em “Daqui a dois anos”. Evite a redundância “há dois anos atrás”."},
+    {"id":"9-O2","grade":9,"topic":"Ortografia","skill":"EF09LP04","prompt":"Na norma-padrão, qual frase emprega adequadamente a crase?","options":["Fui à pé à escola.","Entreguei o livro à ele.","Fui à biblioteca.","Voltei à estudar."],"answer":2,"hint":"Procure a união da preposição “a” com o artigo feminino “a”.","feedback":"Em “Fui à biblioteca”, a preposição exigida por “ir” se une ao artigo de “a biblioteca”. Não há crase antes de “pé”, de “ele” ou do verbo “estudar”."},
+    {"id":"9-O3","grade":9,"topic":"Ortografia","skill":"EF09LP04","prompt":"Qual forma é adequada na norma-padrão para indicar o sujeito de “analisar”?","options":["Para mim analisar","Para eu analisar","Para me analisar isso","Para minha analisar"],"answer":1,"hint":"O pronome é quem realiza a ação do infinitivo.","feedback":"Em “para eu analisar”, eu funciona como sujeito do infinitivo analisar. Mim é adequado depois de preposição quando não desempenha essa função de sujeito."},
+    {"id":"9-O4","grade":9,"topic":"Ortografia","skill":"EF09LP04","prompt":"A biblioteca fechou ___ dois meses, mas ___ pouco foi reaberta.","options":["a / a","há / a","há / há","à / a"],"answer":2,"hint":"A primeira lacuna indica duração passada; a segunda, abertura recente.","feedback":"Há indica tempo decorrido em ambas as lacunas: há dois meses e há pouco. O uso de a para tempo futuro aparece em “daqui a dois meses”."},
+    {"id":"9-O5","grade":9,"topic":"Ortografia","skill":"EF09LP04","prompt":"Qual frase respeita a concordância de haver no sentido de existir?","options":["Haviam muitos livros.","Havia muitos livros.","Houveram muitos livros.","Haviam um livro."],"answer":1,"hint":"Nesse sentido, haver é impessoal e permanece no singular.","feedback":"“Havia muitos livros” usa haver no singular, pois o verbo tem sentido de existir e é impessoal. Com existir, o plural seria “Existiam muitos livros”."},
+    {"id":"9-O6","grade":9,"topic":"Ortografia","skill":"EF09LP04","prompt":"Complete: “Lia revisou o texto ___ chegar à versão final.”","options":["afim de","a fim de","afim-de","a-fim de"],"answer":1,"hint":"A expressão introduz o objetivo da revisão.","feedback":"A fim de, separado, indica finalidade e equivale a para. Afim é adjetivo e significa semelhante ou relacionado, como em “interesses afins”."},
+    {"id":"9-O7","grade":9,"topic":"Ortografia","skill":"EF09LP04","prompt":"Na norma-padrão, qual frase usa crase antes de um nome feminino com artigo?","options":["Levei o texto à escola.","Levei o texto à ele.","Levei o texto à ler.","Levei o texto à pé."],"answer":0,"hint":"Procure a combinação da preposição a com o artigo feminino a.","feedback":"“À escola” combina a preposição a, associada à indicação de destino, com o artigo a de escola. Não há essa combinação antes de ele, ler ou pé."},
+    {"id":"9-O8","grade":9,"topic":"Ortografia","skill":"EF09LP04","prompt":"Qual grafia é adequada no contexto “Essa regra tem uma ___”?","options":["excessão","exceção","esceção","exceçãum"],"answer":1,"hint":"A escrita convencional conserva o grupo “xc” e usa “ç”.","feedback":"A grafia convencional é exceção. O som, sozinho, não determina quais letras devem ser usadas; revisar e consultar palavras menos familiares faz parte da escrita."},
+    {"id":"9-L1","grade":9,"topic":"Literatura Brasileira","skill":"EF89LP37","prompt":"Machado de Assis: “Marcela amou-me durante quinze meses e onze contos de réis”. A associação produz:","options":["Uma medida científica","Ironia sobre amor e dinheiro","Uma regra ortográfica","Descrição neutra do clima"],"answer":1,"hint":"A duração de um sentimento aparece lado a lado com uma quantia de dinheiro.","feedback":"O narrador de “Memórias Póstumas de Brás Cubas” associa amor a tempo e dinheiro, criando ironia sobre a relação. Esse é um ponto de vista do narrador, não uma regra sobre todas as relações."},
+    {"id":"9-L2","grade":9,"topic":"Literatura Brasileira","skill":"EF89LP32","prompt":"Um poema retoma a imagem da terra natal de Gonçalves Dias e a transforma para mostrar uma cidade atual. Isso cria:","options":["Textos sem relação","Uma notícia obrigatória","Intertextualidade","Uma cópia sempre literal"],"answer":2,"hint":"Um texto conversa com outro e pode modificar suas imagens.","feedback":"Há intertextualidade: um texto dialoga com outro ao retomar e transformar suas imagens. O novo contexto pode produzir homenagem, crítica ou contraste."},
+    {"id":"9-L3","grade":9,"topic":"Literatura Brasileira","skill":"EF89LP37","prompt":"Crônica autoral: “Que pontualidade!”, disse Cora quando o ônibus chegou uma hora atrasado. Há:","options":["Ironia","Elogio sem contraste","Uma medida científica","Ausência de contexto"],"answer":0,"hint":"A fala elogia algo que a situação contradiz.","feedback":"Há ironia: a expressão aparenta elogiar a pontualidade, mas o atraso sustenta um sentido crítico. A interpretação depende do contraste entre fala e situação."},
+    {"id":"9-L4","grade":9,"topic":"Literatura Brasileira","skill":"EF69LP47","prompt":"Um narrador afirma ser imparcial, mas só descreve defeitos de seu rival. Para interpretar, convém:","options":["Confiar sem comparar","Examinar sua parcialidade","Ignorar suas escolhas","Aceitar tudo como fato"],"answer":1,"hint":"Compare a afirmação do narrador com a maneira como ele caracteriza o rival.","feedback":"As escolhas do narrador sugerem parcialidade e devem ser examinadas. A leitura crítica confronta o que a voz afirma com as pistas de seu próprio relato."},
+    {"id":"9-L5","grade":9,"topic":"Literatura Brasileira","skill":"EF89LP32","prompt":"Um poema transforma uma narrativa heroica conhecida em uma cena cômica para criticá-la. Essa retomada pode ser:","options":["Uma paródia","Só uma transcrição","Uma ata obrigatória","Uma regra de sintaxe"],"answer":0,"hint":"A nova versão cria contraste crítico ou humorístico com a anterior.","feedback":"Essa retomada pode ser uma paródia: transforma um texto conhecido com efeito crítico ou humorístico. A identificação exige reconhecer o diálogo e a mudança de sentido."},
+    {"id":"9-L6","grade":9,"topic":"Literatura Brasileira","skill":"EF69LP44","prompt":"Um romance apresenta visões diferentes sobre o mesmo bairro brasileiro. Isso permite ao leitor analisar:","options":["Múltiplas experiências","Uma voz como lei","Só o total de páginas","Só a data da edição"],"answer":0,"hint":"Diferentes personagens podem revelar experiências e valores distintos.","feedback":"As perspectivas permitem analisar diferentes experiências, valores e identidades do lugar. A literatura não precisa apresentar uma comunidade como se todos pensassem da mesma forma."},
+    {"id":"9-L7","grade":9,"topic":"Literatura Brasileira","skill":"EF89LP37","prompt":"“O personagem partiu desta vida” suaviza a referência à morte. Esse recurso é:","options":["Eufemismo","Uma comparação","Um vocativo","Uma regra de acento"],"answer":0,"hint":"A escolha das palavras torna menos direta uma expressão difícil.","feedback":"Há eufemismo: a expressão suaviza a referência à morte. O efeito depende das escolhas de linguagem e pode sugerir delicadeza, respeito ou afastamento do termo direto."},
+    {"id":"9-L8","grade":9,"topic":"Literatura Brasileira","skill":"EF89LP32","prompt":"Um poema celebra os encontros na praça. Outro retoma essa imagem para criticar o abandono. O diálogo entre eles revela:","options":["Só cópia literal","Mudança de perspectiva","Ausência de sentidos","Uma única interpretação"],"answer":1,"hint":"A imagem é semelhante, mas recebe valores diferentes nos textos.","feedback":"A retomada da imagem permite analisar mudanças de perspectiva e de sentido. Comparar textos exige observar tanto o elemento compartilhado quanto a maneira diferente de utilizá-lo."}
+  ];
+
+  const canvas = document.getElementById('game');
+  const screen = canvas.getContext('2d', { alpha:false });
+  const buffer = document.createElement('canvas');
+  buffer.width = W; buffer.height = H;
+  const ctx = buffer.getContext('2d', { alpha:false });
+  screen.imageSmoothingEnabled = ctx.imageSmoothingEnabled = false;
+  const gradeSelect = document.getElementById('grade');
+  const avatarSelect = document.getElementById('avatar');
+  const nameInput = document.getElementById('playerName');
+  const inventoryDialog = document.getElementById('inventoryDialog');
+  const rotateFullscreenCheck = document.getElementById('rotateFullscreen');
+  const app = document.getElementById('app');
+  const screenStage = document.getElementById('screenStage');
+  const screenShell = document.querySelector('.screen-shell');
+  const settingsDialog = document.getElementById('settingsDialog');
+  const displayModeSelect = document.getElementById('displayMode');
+  const touchControlsSelect = document.getElementById('touchControls');
+  const doubleClickCheck = document.getElementById('doubleClickConfirm');
+  const settingsSoundCheck = document.getElementById('settingsSound');
+  const live = document.getElementById('accessibleState');
+  const choicesDOM = document.getElementById('accessibleChoices');
+  const notice = document.getElementById('notice');
+  const helpDialog = document.getElementById('helpDialog');
+  const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const integer = (v, a, b) => Number.isInteger(v) && v >= a && v <= b;
+  const countSeals = () => game.seals.filter(Boolean).length;
+  const chapterUnlocked = i => game.seals.slice(0,i).every(Boolean);
+  const completedInChapter = i => (game.questProgress[i]>=3?1:0)+
+    (game.questProgress[i]>=4?1:0)+(game.seals[i]?1:0);
+  const countMissions = () => REGIONS.reduce((n,_,i)=>n+completedInChapter(i),0);
+  function chapterGoal(i) {
+    const q=game.questProgress[i],c=CHAPTERS[i],m=mentors[i];
+    if(game.seals[i]) return 'Capítulo concluído. Selo recuperado!';
+    if(!chapterUnlocked(i)) {
+      const missing=game.seals.slice(0,i).findIndex(v=>!v);
+      return 'Recupere primeiro o selo de '+REGIONS[missing].topic+'.';
+    }
+    if(q===0) return 'Converse com '+m.name+'.';
+    if(q===1) return 'Encontre o baú: '+c.pages+'.';
+    if(q===2) return 'Entregue as páginas a '+m.name+'.';
+    if(q===3) return 'Vença '+c.trial+' na clareira da prova.';
+    return 'Desafie o guardião '+REGIONS[i].monster+'.';
+  }
+  function activeMission() {
+    const i=game.seals.findIndex(v=>!v);
+    if(i<0) return {title:'FINAL · O ARQUIVO CENTRAL',goal:'Entre no Arquivo Central e enfrente o Ruído.',
+      target:objects.find(o=>o.kind==='archive')};
+    const q=game.questProgress[i],stage=q>=4?2:q>=3?1:0;
+    const kind=q===1?'chest':q===3?'trial':q===4?'guardian':'mentor';
+    return {title:'MISSÃO '+(i*3+stage+1)+'/12 · '+CHAPTERS[i].titles[stage].toUpperCase(),
+      goal:chapterGoal(i),target:objects.find(o=>o.kind===kind && o.region===i)};
+  }
+  function openMissions() {
+    if(!game.started || game.state===STATES.GAME_OVER || game.state===STATES.VICTORY) return;
+    clearInput();game.overlay={type:'journal',page:3};dirty=true;announce();
+  }
+  let dirty = true, hitAreas = [], lastAnimationFrame = -1, lastTime = 0;
+  let inputRepeat = 0, camera = {x:0,y:0}, audioContext = null, soundOn = false;
+  let storageAllowed = true;
+  const VIEW_SETTINGS_KEY = 'lexico.display.v1';
+  const viewSettings = {mode:'auto',controls:'auto',doubleClick:true,sound:false,avatar:'boy',name:'',rotateFullscreen:true};
+  let lastCanvasPointerType = 'mouse', fitPending = false, fullscreenFallback = false;
+
+  // Sem esticar os pixels: 4:3 no computador/paisagem, 1:1 no celular em pé.
+  // A área adicional revela mais tiles e permite alternativas maiores em uma coluna.
+  function setViewport(portrait) {
+    const nextH=portrait?640:480;
+    if(H===nextH) return;
+    H=nextH;VIEW.h=(H-160)/SCALE;
+    canvas.height=buffer.height=H;
+    screen.imageSmoothingEnabled=ctx.imageSmoothingEnabled=false;
+    wrapCache.clear();hitAreas=[];dirty=true;
+  }
+  function fitScreen() {
+    if(!game.started) return;
+    const portrait=H===640;
+    // No celular há só uma borda de 1px por lado; no PC, borda e padding.
+    const frame=app.dataset.interface==='mobile' || portrait?2:8;
+    const availableW=Math.max(1,screenStage.clientWidth-frame);
+    let availableH=Math.max(1,screenStage.clientHeight-frame);
+    if(portrait) {
+      // O grid não ocupa uma linha flexível: tela e controles permanecem juntos.
+      const layout=document.querySelector('.game-layout');
+      const top=layout.getBoundingClientRect().top-app.getBoundingClientRect().top;
+      const pads=app.dataset.controls==='show'?
+        Math.max(document.querySelector('.pad-side').offsetHeight,document.querySelector('.action-side').offsetHeight)+10:0;
+      availableH=Math.max(1,(app.clientHeight||window.innerHeight)-top-pads-notice.offsetHeight-14);
+    }
+    const width=Math.max(1,Math.floor(Math.min(availableW,availableH*W/H)));
+    const height=width*H/W;
+    screenShell.style.width=(width+frame)+'px';
+    screenShell.style.height=(height+frame)+'px';
+  }
+  function scheduleScreenFit() {
+    if(fitPending) return;
+    fitPending=true;
+    window.requestAnimationFrame(()=>{fitPending=false;fitScreen();});
+  }
+  function resolvedDisplayMode() {
+    if(viewSettings.mode!=='auto') return viewSettings.mode;
+    return window.matchMedia && window.matchMedia('(pointer: coarse)').matches?'mobile':'desktop';
+  }
+  function storeViewSettings() {
+    try {localStorage.setItem(VIEW_SETTINGS_KEY,JSON.stringify(viewSettings));}
+    catch(err) { /* Preferências opcionais não bloqueiam o arquivo local. */ }
+  }
+  function applyViewSettings() {
+    const mode=resolvedDisplayMode();
+    const show=viewSettings.controls==='show' ||
+      (viewSettings.controls==='auto' && mode==='mobile');
+    app.dataset.interface=mode;app.dataset.controls=show?'show':'hide';
+    app.dataset.dock=window.innerWidth>window.innerHeight?'side':'bottom';
+    const touchDevice=window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    const portrait=(mode==='mobile' || touchDevice) && app.dataset.dock==='bottom';
+    app.dataset.viewport=portrait?'portrait':'landscape';setViewport(portrait);
+    displayModeSelect.value=viewSettings.mode;touchControlsSelect.value=viewSettings.controls;
+    doubleClickCheck.checked=viewSettings.doubleClick;settingsSoundCheck.checked=soundOn;
+    rotateFullscreenCheck.checked=viewSettings.rotateFullscreen;
+    document.getElementById('displaySummary').textContent=
+      (mode==='desktop'?'Computador':'Celular')+' · Controles na tela: '+(show?'visíveis':'ocultos')+
+      '. As alterações não reiniciam a aventura.';
+    document.querySelector('.below').textContent=mode==='desktop'?
+      'WASD / setas · Enter / Z confirma · X / B volta · I bolsa · J missões · F tela cheia · O opções':
+      'D-Pad para mover · A confirma · B volta · Toque nas opções para selecionar';
+    clearInput();dirty=true;fitScreen();scheduleScreenFit();
+  }
+  function openHelp() {game.paused=true;clearInput();helpDialog.showModal();}
+  function openSettings() {game.paused=true;clearInput();settingsDialog.showModal();}
+  function setAvatar(avatar) {
+    if(game.started) return; // A escolha pertence à abertura da nova aventura.
+    if(!['boy','girl'].includes(avatar)) return;
+    game.avatar=avatar;viewSettings.avatar=avatar;
+    avatarSelect.value=avatar;
+    storeViewSettings();saveGame();dirty=true;announce();
+  }
+  function updateSound(enabled,playTone) {
+    soundOn=enabled;viewSettings.sound=enabled;settingsSoundCheck.checked=enabled;
+    const button=document.getElementById('soundButton');
+    button.textContent='Som: '+(enabled?'ligado':'desligado');
+    button.setAttribute('aria-pressed',String(enabled));storeViewSettings();
+    if(playTone) tone('select');
+  }
+  function syncFullscreenUI() {
+    const active=!!(document.fullscreenElement || document.webkitFullscreenElement);
+    const immersive=active || fullscreenFallback;
+    app.classList.toggle('is-immersive',immersive);
+    const label=active?'Sair da tela cheia':fullscreenFallback?'Sair da tela ampliada':'Tela cheia';
+    const button=document.getElementById('fullButton');
+    button.textContent=immersive?'Sair ⛶':'⛶ Tela cheia';button.setAttribute('aria-label',label);
+    document.getElementById('settingsFullscreen').textContent=label;
+    applyViewSettings();
+  }
+  async function toggleFullscreen() {
+    clearInput();
+    try {
+      const active=document.fullscreenElement || document.webkitFullscreenElement;
+      const exit=document.exitFullscreen || document.webkitExitFullscreen;
+      const enter=app.requestFullscreen || app.webkitRequestFullscreen;
+      if(active && exit) {
+        fullscreenFallback=false;await exit.call(document);
+        if(window.screen && window.screen.orientation && window.screen.orientation.unlock) window.screen.orientation.unlock();
+      }
+      else if(fullscreenFallback) fullscreenFallback=false;
+      else if(enter) {
+        fullscreenFallback=false;await enter.call(app);
+        if(resolvedDisplayMode()==='mobile' && viewSettings.rotateFullscreen && window.screen && window.screen.orientation && window.screen.orientation.lock) {
+          try {await window.screen.orientation.lock('landscape');} catch(err) { /* Girar o aparelho continua funcionando. */ }
+        }
+      }
+      else {
+        fullscreenFallback=true;
+        notice.textContent='Tela ampliada ativada. Para ocultar também as barras do navegador no PC, use F11.';
+      }
+    } catch(err) {
+      fullscreenFallback=true;
+      notice.textContent='O navegador não liberou a tela cheia. A área do jogo foi ampliada dentro da janela.';
+    }
+    if(!fullscreenFallback) notice.textContent='';
+    syncFullscreenUI();canvas.focus({preventScroll:true});
+  }
+
+  function cleanName(value) {
+    const clean=String(value||'').replace(/[\u0000-\u001f\u007f<>]/g,'').replace(/\s+/g,' ').trim();
+    return Array.from(clean).slice(0,18).join('')||'Aprendiz';
+  }
+  function setSaveStatus(message,status) {
+    const target=document.getElementById('saveStatus');
+    target.textContent=message;target.dataset.status=status||'saved';
+  }
+  function syncGameUI() {
+    const welcome=!game.started;
+    app.dataset.screen=welcome?'welcome':'game';
+    document.getElementById('onboarding').hidden=!welcome;
+    document.getElementById('inventoryButton').disabled=welcome ||
+      game.state===STATES.GAME_OVER || game.state===STATES.VICTORY;
+    document.getElementById('playerBadge').textContent=game.playerName+' · '+game.grade+'º ano';
+    document.getElementById('chooseBoy').setAttribute('aria-pressed',String(game.avatar==='boy'));
+    document.getElementById('chooseGirl').setAttribute('aria-pressed',String(game.avatar==='girl'));
+    const resume=document.getElementById('resumeButton'),details=document.getElementById('resumeDetails');
+    resume.hidden=details.hidden=!game.saved;
+    if(game.saved) {
+      resume.textContent='Continuar · '+(game.saved.playerName||'Aprendiz');
+      details.textContent=game.saved.grade+'º ano · '+game.saved.seals.filter(Boolean).length+'/4 selos · HP '+game.saved.hp;
+    }
+    if(!welcome) scheduleScreenFit();
+  }
+  function resumeSimulation() {
+    game.paused=document.hidden || helpDialog.open || settingsDialog.open || inventoryDialog.open;
+    lastTime=0;clearInput();dirty=true;
+    if(game.started) canvas.focus({preventScroll:true});
+  }
+  function refreshInventory() {
+    const b=game.battle,canUse=game.state===STATES.BATTLE_MENU && !!b;
+    document.getElementById('inventorySummary').textContent=
+      game.playerName+' · '+game.grade+'º ano · HP '+game.player.hp+'/'+MAX_HP;
+    document.getElementById('dictionaryCount').textContent='Dicionários · '+game.dictionaries+' na bolsa';
+    document.getElementById('studyCount').textContent=b?'Estudos · '+b.studies+' restantes nesta batalha':'Estudos · 3 por batalha';
+    const dictionary=document.getElementById('inventoryDictionary'),study=document.getElementById('inventoryStudy');
+    dictionary.disabled=!canUse || game.dictionaries<=0 || b.aidReady;
+    study.disabled=!canUse || b.studies<=0 || game.player.hp===MAX_HP;
+    dictionary.textContent=b && b.aidReady?'Dicionário preparado':canUse?'Preparar dicionário':'Use no menu de batalha';
+    study.textContent=canUse?'Estudar e recuperar HP':'Use no menu de batalha';
+    document.getElementById('missionCount').textContent='Missões · '+countMissions()+'/12 concluídas';
+    document.getElementById('missionGoal').textContent=activeMission().goal;
+    const carried=CHAPTERS.filter((_,i)=>game.questProgress[i]===2).map(c=>c.pages);
+    document.getElementById('carriedPages').textContent=carried.length?'Na bolsa: '+carried.join(', ')+'.':'Nenhuma página aguardando entrega.';
+    const seals=document.getElementById('inventorySeals');seals.replaceChildren();
+    REGIONS.forEach((region,i)=>{
+      const badge=document.createElement('span');badge.dataset.earned=String(game.seals[i]);
+      badge.textContent=(game.seals[i]?'✓ ':'○ ')+region.topic.replace(' Brasileira','');seals.appendChild(badge);
+    });
+    document.getElementById('saveNow').disabled=!storageAllowed || game.state!==STATES.OVERWORLD;
+    document.getElementById('inventorySaveNote').textContent=!storageAllowed?
+      'O navegador não disponibilizou o armazenamento. A partida continua funcionando.':
+      game.state===STATES.OVERWORLD?'Salvamento automático ativo: passos, itens e descobertas são registrados.':
+      'O último ponto salvo é anterior a esta batalha. A próxima gravação ocorre ao voltar ao mapa.';
+  }
+  function openInventory() {
+    if(!game.started || game.state===STATES.GAME_OVER || game.state===STATES.VICTORY) return;
+    game.paused=true;clearInput();refreshInventory();inventoryDialog.showModal();
+  }
+  function useInventoryItem(menu) {
+    if(game.state!==STATES.BATTLE_MENU || !game.battle) return;
+    inventoryDialog.close();game.overlay=null;game.battle.menu=menu;chooseBattleMenu();
+  }
+
+  // Mapa determinístico: decoração nunca interfere na chance de encontro.
+  let mapSeed = 74123;
+  function mapRandom() {
+    mapSeed = (Math.imul(mapSeed,1664525) + 1013904223) >>> 0;
+    return mapSeed / 4294967296;
+  }
+  const tiles = Array.from({length:WORLD_H}, () => Array(WORLD_W).fill(T.GRASS));
+  function tileAt(x,y) {
+    return integer(x,0,WORLD_W-1) && integer(y,0,WORLD_H-1) ? tiles[y][x] : T.WALL;
+  }
+  function regionAt(x,y) { return (y >= 44 ? 2 : 0) + (x >= 56 ? 1 : 0); }
+  function paintArea(x,y,w,h,tile) {
+    for (let j=y;j<y+h;j++) for (let i=x;i<x+w;i++)
+      if (i>=0 && i<WORLD_W && j>=0 && j<WORLD_H) tiles[j][i]=tile;
+  }
+  for (let y=0;y<WORLD_H;y++) for (let x=0;x<WORLD_W;x++) {
+    const r=mapRandom();
+    tiles[y][x] = (x<2 || y<2 || x>=WORLD_W-2 || y>=WORLD_H-2) ? T.TREE :
+      r<0.09 ? T.TREE : r<0.43 ? T.HIGH : T.GRASS;
+  }
+  paintArea(8,50,11,8,T.WATER); paintArea(72,5,9,6,T.WATER);
+  paintArea(2,43,WORLD_W-4,3,T.PATH); paintArea(55,3,3,WORLD_H-6,T.PATH);
+  [18,93].forEach(x => paintArea(x-1,13,3,61,T.PATH));
+  REGIONS.forEach(r => paintArea(r.x-2,r.y-2,5,5,T.FLOOR));
+  paintArea(HUB.x-6,HUB.y-1,13,6,T.FLOOR);
+  paintArea(HUB.x-2,HUB.y-10,5,4,T.WALL);
+  paintArea(HUB.x,HUB.y-6,1,4,T.PATH);
+  paintArea(HUB.x-6,HUB.y,3,2,T.WALL);
+
+  // Trilhas em L ligam cada objetivo ao santuário ou à clareira de estudo.
+  // A decoração é gerada antes delas para nunca bloquear uma missão.
+  function connectPath(from,to) {
+    paintArea(Math.min(from.x,to.x),from.y,Math.abs(from.x-to.x)+1,1,T.PATH);
+    paintArea(to.x,Math.min(from.y,to.y),1,Math.abs(from.y-to.y)+1,T.PATH);
+    paintArea(to.x-1,to.y-1,3,3,T.FLOOR);
+  }
+  const mentors=REGIONS.map((r,i)=>{
+    const position={x:r.x+(i%2===0?4:-4),y:r.y+(i<2?4:-4)};
+    connectPath(r,position);
+    return {kind:'mentor',...position,region:i,
+      name:['Nilo das Formas','Bia das Frases','Ivo da Escrita','Cora das Histórias'][i]};
+  });
+  const chests=CHAPTERS.map((c,i)=>{
+    connectPath(REGIONS[i],c.chest);
+    return {kind:'chest',...c.chest,region:i,name:c.pages};
+  });
+  const trials=CHAPTERS.map((c,i)=>{
+    connectPath(mentors[i],c.arena);
+    return {kind:'trial',...c.arena,region:i,name:c.trial};
+  });
+  const objects = [
+    {kind:'teacher',x:HUB.x-2,y:HUB.y,name:'Professora Lina'},
+    {kind:'healer',x:HUB.x-4,y:HUB.y+2,name:'Bibliotecária Nara'},
+    {kind:'sign',x:HUB.x+2,y:HUB.y,name:'Placa da vila'},
+    {kind:'archive',x:HUB.x,y:HUB.y-6,name:'Arquivo Central'},
+    ...REGIONS.map((r,i)=>({kind:'guardian',x:r.x,y:r.y,name:r.monster,region:i})),
+    ...mentors,...chests,...trials
+  ];
+  function objectAt(x,y) { return objects.find(o=>o.x===x && o.y===y); }
+  function walkable(x,y) {
+    const t=tileAt(x,y);
+    return t!==T.WATER && t!==T.TREE && t!==T.WALL && !objectAt(x,y);
+  }
+
+  // --------------------------------------------------------------------------
+  // ARTE: sprites originais descritos por matrizes internas; só fillRect.
+  // Cada ponto é transparente, cada letra seleciona uma cor da paleta.
+  // --------------------------------------------------------------------------
+  const PLAYER = [
+    '.....tttttt.....','....tttttttt....','...tttttttttt...',
+    '...hhhhhhhhhh...','....hsssshss....','....sisssis.....',
+    '....sssssss.....','.....sssss......','...rrrrrrrrr....',
+    '..prrwwwwrrrp...','..prrwwwwrrrp...','..ssrwwwwrrss...',
+    '...rrwwwwrr.....','....rrrrrr......','....dd.dd.......',
+    '....dd.dd.......','...hhh.hhh......'
+  ];
+  const PLAYER_GIRL = [
+    '.....hhhhhh.....','....hhhhhhhh....','...hhhtthhhhh...',
+    '...hhsssssshh...','...hsisssishh...','..hhssssssshh...',
+    '..hhhssssshhh...','..hhh.sss.hhh...',
+    ...PLAYER.slice(8)
+  ];
+  const MONSTER = [
+    '....bb....bb....','...bccb..bccb...','...bccbbbbccb...',
+    '...bccccccccb...','..bccccccccccb..','..bcwwccccwwcb..',
+    '..bcwibccbiwcb..','..bccccccccccb..','...bccccccccb...',
+    '..bbccccccccbb..','.bccbppppppbccb.','.bcbppwwwwppbcb.',
+    '..bppwwwwwwppb..','...bpwwwwwwpb...','....bppppppb....',
+    '...bbb....bbb...','..bccc....cccb..','..bbbb....bbbb..'
+  ];
+  const BOSS = [
+    'bb............bb','bcb..........bcb','bccb........bccb',
+    '.bccbbbbbbbbccb.','..bccccccccccb..','..bcwwccccwwcb..',
+    '..bcwibccbiwcb..','..bccccccccccb..','.bbbccbbbbccbbb.',
+    'bcccbppppppbcccb','bcccbbwwwwbbcccb','bbcbppwwwwppbcbb',
+    '..bppwwwwwwppb..','...bpwwwwwwpb...','....bppppppb....',
+    '...bbccccccbb...','..bb........bb..','..bbb......bbb..'
+  ];
+  function rect(g,x,y,w,h,color) { g.fillStyle=color; g.fillRect(Math.round(x),Math.round(y),w,h); }
+  function sprite(g,pattern,palette,x,y,scale,flip) {
+    for (let row=0;row<pattern.length;row++) for (let col=0;col<pattern[row].length;col++) {
+      const color=palette[pattern[row][col]];
+      if (color) rect(g,x+(flip ? 15-col : col)*scale,y+row*scale,scale,scale,color);
+    }
+  }
+  function drawPlayer(g,x,y,scale,facing,walking,teacher,avatarOverride) {
+    const girl=!teacher && (avatarOverride||game.avatar)==='girl';
+    const palette = {t:teacher?C.purple:girl?C.blue:C.teal,h:C.hair,s:C.skinLight,i:C.ink,
+      r:teacher?C.blue:girl?C.purple:C.coat,w:C.paper,p:C.path,d:C.tealDark};
+    if (facing==='up') {
+      palette.i=C.hair; palette.s=C.hair;
+    }
+    rect(g,x+3*scale,y+16*scale,11*scale,3*scale,C.ink);
+    sprite(g,girl?PLAYER_GIRL:PLAYER,palette,x,y+(walking?scale:0),scale,facing==='left');
+    if (walking) rect(g,x+4*scale,y+16*scale,3*scale,2*scale,C.hair);
+  }
+  function drawMonster(g,x,y,scale,region,boss,crowned) {
+    const r=REGIONS[region];
+    rect(g,x+2*scale,y+17*scale,12*scale,2*scale,C.ink);
+    sprite(g,boss?BOSS:MONSTER,{b:boss?C.purpleDark:r.dark,c:boss?C.purple:r.color,
+      w:C.white,i:C.ink,p:boss?C.coat:C.gold},x,y,scale,false);
+    // Silhuetas específicas: asas, pena, antena ou cauda.
+    if (region===0 && !boss) {
+      rect(g,x+7*scale,y-3*scale,2*scale,4*scale,C.greenDark);
+      rect(g,x+8*scale,y-3*scale,4*scale,2*scale,C.grassLight);
+    }
+    if (region===1 && !boss) {
+      rect(g,x-scale,y+9*scale,3*scale,5*scale,C.blue);
+      rect(g,x+14*scale,y+9*scale,3*scale,5*scale,C.blue);
+    }
+    if (region===2 && !boss) {
+      rect(g,x+14*scale,y+5*scale,2*scale,9*scale,C.orangeDark);
+      rect(g,x+14*scale,y+3*scale,2*scale,3*scale,C.gold);
+    }
+    if (region===3 && !boss) {
+      rect(g,x+14*scale,y+11*scale,4*scale,3*scale,C.purpleDark);
+      rect(g,x+17*scale,y+8*scale,2*scale,5*scale,C.paper);
+    }
+    if (crowned) {
+      rect(g,x+5*scale,y-2*scale,6*scale,2*scale,C.gold);
+      [5,8,10].forEach(i=>rect(g,x+i*scale,y-4*scale,scale,3*scale,C.gold));
+    }
+  }
+  function drawTree(g,x,y) {
+    rect(g,x+6,y+10,4,6,C.trunk);
+    rect(g,x+3,y+2,10,11,C.treeDark);
+    rect(g,x+1,y+5,14,7,C.tree);
+    rect(g,x+4,y,8,10,C.treeLight);
+    rect(g,x+5,y+1,3,2,C.grass);
+  }
+  function drawBook(g,x,y,s,color) {
+    rect(g,x,y,18*s,13*s,C.ink);
+    rect(g,x+s,y+s,7*s,10*s,C.paper);
+    rect(g,x+10*s,y+s,7*s,10*s,C.white);
+    rect(g,x+8*s,y+s,2*s,11*s,color);
+    for(let i=0;i<3;i++) {
+      rect(g,x+2*s,y+(3+i*3)*s,4*s,s,C.pathDark);
+      rect(g,x+11*s,y+(3+i*3)*s,4*s,s,C.pathDark);
+    }
+  }
+  // Abertura original desenhada uma vez: céu em pixels, quatro regiões,
+  // livro-portal e os dois protagonistas. Nenhuma imagem entra no runtime.
+  function drawOpeningArt() {
+    const art=document.getElementById('openingArt'),g=art.getContext('2d');
+    g.imageSmoothingEnabled=false;rect(g,0,0,960,440,C.dark);
+    rect(g,0,142,960,162,C.blueDark);
+    for(let i=0;i<13;i++) {
+      const x=i*80-20,h=65+(i%4)*22;
+      rect(g,x,207-h,96,h,C.border);rect(g,x+20,190-h,54,35,C.border);
+    }
+    [[84,49],[169,83],[285,32],[659,48],[747,90],[856,37],[902,121]].forEach(([x,y],i)=>{
+      rect(g,x-3,y,10,4,i%2?C.teal:C.gold);rect(g,x,y-3,4,10,i%2?C.teal:C.gold);
+    });
+    // Ruínas, estantes e bosques ao fundo do portal.
+    for(let i=0;i<5;i++) {
+      rect(g,128+i*26,175,18,100,C.blue);rect(g,123+i*26,168,28,8,C.border);
+      rect(g,682+i*24,177,16,93,C.purpleDark);
+    }
+    rect(g,117,163,146,10,C.blue);rect(g,671,167,140,10,C.purple);
+    rect(g,0,289,960,151,C.greenDark);rect(g,0,340,960,100,C.treeDark);
+    for(let i=0;i<8;i++) {
+      g.save();g.translate(i<4?i*64-14:754+(i-4)*65,238+(i%2)*19);g.scale(5,5);drawTree(g,0,0);g.restore();
+    }
+    rect(g,250,272,460,28,C.goldDark);rect(g,264,280,432,20,C.path);
+    rect(g,290,300,380,17,C.pathDark);rect(g,323,317,314,12,C.ink);
+    rect(g,440,329,80,111,C.pathDark);rect(g,453,329,54,111,C.path);
+    // Halo escalonado, sem filtros nem gradientes.
+    rect(g,378,67,203,172,C.blueDark);rect(g,391,79,177,147,C.tealDark);
+    rect(g,404,91,151,125,C.teal);
+    drawBook(g,390,104,10,C.tealDark);
+    rect(g,479,60,6,30,C.gold);rect(g,444,69,5,16,C.gold);rect(g,515,70,5,16,C.gold);
+    REGIONS.forEach((r,i)=>{
+      const x=299+i*110;rect(g,x,238,35,32,r.dark);rect(g,x+4,242,27,24,r.color);
+      drawBook(g,x+8,248,1,C.gold);
+    });
+    drawPlayer(g,301,291,5,'down',false,false,'boy');
+    drawPlayer(g,586,291,5,'down',false,false,'girl');
+    for(let i=0;i<24;i++) {
+      const x=26+i*41,y=386+(i%3)*16;if(x>390 && x<560) continue;
+      rect(g,x,y,6,6,i%2?C.orange:C.purple);rect(g,x+2,y+2,2,2,C.gold);
+    }
+  }
+  function drawInterfaceIcons() {
+    [['boyPreview','boy'],['girlPreview','girl']].forEach(([id,avatar])=>{
+      const g=document.getElementById(id).getContext('2d');g.clearRect(0,0,64,80);
+      g.imageSmoothingEnabled=false;drawPlayer(g,8,8,3,'down',false,false,avatar);
+    });
+    [['dictionaryIcon',C.teal],['studyIcon',C.green],['journalIcon',C.gold],['missionIcon',C.orange]].forEach(([id,color])=>{
+      const g=document.getElementById(id).getContext('2d');g.clearRect(0,0,40,40);drawBook(g,2,8,2,color);
+    });
+  }
+
+  const worldCache = document.createElement('canvas');
+  worldCache.width=WORLD_W*TILE; worldCache.height=WORLD_H*TILE;
+  const worldCtx = worldCache.getContext('2d',{alpha:false});
+  worldCtx.imageSmoothingEnabled=false;
+  for (let y=0;y<WORLD_H;y++) for(let x=0;x<WORLD_W;x++) {
+    const px=x*TILE,py=y*TILE,t=tiles[y][x],r=REGIONS[regionAt(x,y)];
+    rect(worldCtx,px,py,TILE,TILE,C.grass);
+    if(t===T.GRASS || t===T.HIGH || t===T.TREE) {
+      rect(worldCtx,px+((x*7+y*3)%13),py+((x*3+y*7)%13),2,1,C.grassLight);
+      rect(worldCtx,px+2,py+12,3,1,C.green);
+    }
+    if(t===T.HIGH) {
+      for(let j=0;j<3;j++) for(let i=0;i<3;i++) {
+        const gx=px+1+i*5,gy=py+3+j*5;
+        rect(worldCtx,gx,gy,3,4,C.greenDark);
+        rect(worldCtx,gx,gy,1,3,C.grassLight);
+        rect(worldCtx,gx+2,gy-1,1,4,C.treeLight);
+      }
+    } else if(t===T.PATH || t===T.FLOOR) {
+      rect(worldCtx,px,py,16,16,t===T.PATH?C.path:C.pathDark);
+      if(t===T.FLOOR) {
+        rect(worldCtx,px,py,16,1,C.path);rect(worldCtx,px,py,1,16,C.path);
+        rect(worldCtx,px+8,py+8,8,1,C.path);
+      } else {
+        rect(worldCtx,px+3,py+5,2,1,C.pathDark);
+        rect(worldCtx,px+11,py+12,2,1,C.pathDark);
+      }
+    } else if(t===T.TREE) drawTree(worldCtx,px,py);
+    else if(t===T.WATER) {
+      rect(worldCtx,px,py,16,16,C.water);
+      rect(worldCtx,px+2,py+4,6,1,C.waterLight);
+      rect(worldCtx,px+9,py+11,5,1,C.waterLight);
+    } else if(t===T.WALL) {
+      rect(worldCtx,px,py,16,16,C.rock);
+      rect(worldCtx,px,py+7,16,1,C.ink);
+      rect(worldCtx,px+7,py,1,7,C.border);
+      rect(worldCtx,px+3,py+9,1,7,C.border);
+    }
+    // Flores e pedras localizam visualmente as quatro regiões.
+    if(t===T.GRASS && (x*17+y*13)%23===0) {
+      rect(worldCtx,px+7,py+6,3,3,r.color);
+      rect(worldCtx,px+8,py+7,1,1,C.gold);
+    }
+  }
+  // Edifícios desenhados uma vez no fundo cacheado, relativos à nova vila.
+  const archiveX=HUB.x-2,archiveY=HUB.y-10;
+  rect(worldCtx,archiveX*TILE,archiveY*TILE,80,12,C.blueDark);
+  rect(worldCtx,(archiveX+1)*TILE,archiveY*TILE-5,48,8,C.blue);
+  rect(worldCtx,archiveX*TILE+3,archiveY*TILE+13,74,4,C.goldDark);
+  [HUB.x-1,HUB.x+1].forEach(x=>{
+    rect(worldCtx,x*TILE+2,(archiveY+1)*TILE+2,12,17,C.ink);
+    rect(worldCtx,x*TILE+4,(archiveY+1)*TILE+4,8,10,C.gold);
+    rect(worldCtx,x*TILE+7,(archiveY+1)*TILE+4,1,10,C.goldDark);
+  });
+  drawBook(worldCtx,HUB.x*TILE-8,archiveY*TILE-4,1,C.coat);
+  rect(worldCtx,(HUB.x-6)*TILE-2,HUB.y*TILE-7,52,12,C.coat);
+  rect(worldCtx,(HUB.x-6)*TILE+5,HUB.y*TILE-13,38,8,C.orangeDark);
+  drawBook(worldCtx,(HUB.x-5)*TILE-1,HUB.y*TILE-7,1,C.teal);
+  REGIONS.forEach(r=>{
+    rect(worldCtx,r.x*TILE-6,r.y*TILE+9,28,10,r.dark);
+    rect(worldCtx,r.x*TILE-4,r.y*TILE+9,24,3,r.color);
+  });
+
+  const battleBackgrounds = REGIONS.map(r=>{
+    const b=document.createElement('canvas');b.width=W;b.height=184;
+    const g=b.getContext('2d',{alpha:false});
+    rect(g,0,0,W,184,C.ink);
+    rect(g,0,26,W,108,r.dark);
+    // Relevos em pixels, paleta limitada; nenhum gradiente ou imagem externa.
+    for(let i=0;i<12;i++) {
+      const x=i*59-12,y=46+(i%3)*13;
+      rect(g,x,y,46,88-y,r.color);
+      rect(g,x+8,y-14,30,16,r.color);
+      rect(g,x+18,y-24,12,12,r.color);
+    }
+    rect(g,0,132,W,52,r.dark);
+    rect(g,14,160,235,12,C.ink);rect(g,340,125,252,13,C.ink);
+    for(let i=0;i<22;i++) rect(g,i*31,(i%2?148:179),15,2,r.color);
+    return b;
+  });
+
+  // Textos e painéis são UI; toda ilustração acima usa retângulos de pixels.
+  function text(str,x,y,size,color,align) {
+    ctx.font=(size>=30?'bold ':'')+size+'px "Courier New", monospace';
+    ctx.fillStyle=color||C.paper;ctx.textAlign=align||'left';ctx.textBaseline='top';
+    ctx.fillText(str,x,y);ctx.textAlign='left';
+  }
+  function nameFont(str,width,size,min) {
+    ctx.font=size+'px "Courier New", monospace';
+    while(size>min && ctx.measureText(str).width>width) {
+      size--;ctx.font=size+'px "Courier New", monospace';
+    }
+    return size;
+  }
+  const wrapCache = new Map();
+  function wrap(str,width,size) {
+    const key=size+'|'+width+'|'+str;
+    if(wrapCache.has(key)) return wrapCache.get(key);
+    ctx.font=size+'px "Courier New", monospace';
+    const out=[];
+    String(str).split('\n').forEach(paragraph=>{
+      let line='';
+      paragraph.split(/\s+/).filter(Boolean).forEach(word=>{
+        if(ctx.measureText(word).width>width) {
+          if(line) {out.push(line);line='';}
+          let part='';
+          for(const letter of word) {
+            if(part && ctx.measureText(part+letter).width>width) {out.push(part);part='';}
+            part+=letter;
+          }
+          line=part;
+        } else {
+          const candidate=line ? line+' '+word : word;
+          if(line && ctx.measureText(candidate).width>width) {out.push(line);line=word;}
+          else line=candidate;
+        }
+      });
+      out.push(line);
+    });
+    if(wrapCache.size>500) wrapCache.clear();
+    wrapCache.set(key,out);return out;
+  }
+  function paragraph(str,x,y,width,size,lineHeight) {
+    const lines=wrap(str,width,size);
+    lines.forEach((line,i)=>text(line,x,y+i*(lineHeight||size+4),size));
+    return y+lines.length*(lineHeight||size+4);
+  }
+  function panel(x,y,w,h,fill,border) {
+    rect(ctx,x,y,w,h,border||C.border);
+    rect(ctx,x+3,y+3,w-6,h-6,fill||C.ink);
+    rect(ctx,x+6,y+6,w-12,1,C.border);
+  }
+  function healthBar(x,y,width,hp,max) {
+    rect(ctx,x,y,width,12,C.dark);
+    const ratio=clamp(hp/max,0,1);
+    const color=ratio>0.5 ? C.green : ratio>0.25 ? C.gold : C.red;
+    rect(ctx,x+2,y+2,Math.round((width-4)*ratio),8,color);
+  }
+  function buttonBox(x,y,w,h,label,detail,selected,action,disabled) {
+    panel(x,y,w,h,selected?C.border:C.ink,selected?C.gold:C.border);
+    text(label,x+15,y+9,22,disabled?C.muted:selected?C.gold:C.paper);
+    if(detail) text(detail,x+15,y+35,14,disabled?C.muted:C.muted);
+    if(!disabled && action) hitAreas.push({x,y,w,h,action});
+  }
+  function dialogPages(str) {
+    const lines=wrap(str,550,24),pages=[];
+    for(let i=0;i<lines.length;i+=5) pages.push(lines.slice(i,i+5));
+    return pages;
+  }
+
+  // --------------------------------------------------------------------------
+  // ESTADO E PERSISTÊNCIA. Um checkpoint nunca retoma uma pergunta pela metade.
+  // Falha de localStorage em file:// não interrompe a partida.
+  // --------------------------------------------------------------------------
+  function emptyStats() {
+    return REGIONS.map(()=>({attempts:0,correct:0}));
+  }
+  const game = {
+    state:STATES.OVERWORLD, grade:6, avatar:'boy', playerName:'Aprendiz', started:false, paused:false, time:0,
+    player:{x:HUB.x,y:HUB.y,facing:'down',hp:MAX_HP,displayHP:MAX_HP,step:null},
+    seals:[false,false,false,false], dictionaries:3, stats:emptyStats(),
+    explorations:[false,false,false,false],
+    // 0: conversar; 1: buscar; 2: entregar; 3: prova; 4: guardião; 5: concluído.
+    questProgress:[0,0,0,0],
+    battlesWon:0, usedQuestions:[], lastQuestion:null,
+    battle:null, overlay:null, saved:null,
+    message:'Converse com Lina na vila ou explore as quatro regiões.'
+  };
+  function readSave() {
+    let raw;
+    try {
+      raw=localStorage.getItem(SAVE_KEY);
+    } catch(err) {storageAllowed=false;return null;}
+    if(!raw) return null;
+    try {
+      const s=JSON.parse(raw);
+      if(s.version===1) {
+        if(!integer(s.x,0,47) || !integer(s.y,0,39)) return null;
+        s.x+=16;s.y+=12;s.version=2; // Mundo original 48 × 40 → 80 × 64.
+      }
+      if(s.version===2) s.version=3;
+      if(s.version===3) {
+        if(!integer(s.x,0,79) || !integer(s.y,0,63)) return null;
+        s.x+=HUB.x-40;s.y+=HUB.y-34;s.version=4;
+        if(!walkable(s.x,s.y)) {s.x=HUB.x;s.y=HUB.y;}
+      }
+      if(s.version!==4 || !integer(s.grade,6,9) || !integer(s.x,0,WORLD_W-1) ||
+        !integer(s.y,0,WORLD_H-1) || !walkable(s.x,s.y) || !integer(s.hp,1,MAX_HP) ||
+        !Array.isArray(s.seals) || s.seals.length!==4 || !s.seals.every(v=>typeof v==='boolean') ||
+        !integer(s.dictionaries,0,9) || !integer(s.battlesWon,0,100000) ||
+        !Array.isArray(s.stats) || s.stats.length!==4 ||
+        !s.stats.every(v=>v && integer(v.attempts,0,100000) && integer(v.correct,0,v.attempts))) return null;
+      // Selos antigos valem os três objetivos do respectivo capítulo.
+      if(s.questProgress==null) s.questProgress=s.seals.map(v=>v?5:0);
+      if(!Array.isArray(s.questProgress) || s.questProgress.length!==4 ||
+        !s.questProgress.every(v=>integer(v,0,5))) return null;
+      s.questProgress=s.questProgress.map((v,i)=>s.seals[i]?5:Math.min(v,4));
+      s.playerName=cleanName(s.playerName);
+      s.savedAt=Number.isSafeInteger(s.savedAt) && s.savedAt>=0?s.savedAt:0;
+      if(s.avatar==null) s.avatar='boy';
+      if(!['boy','girl'].includes(s.avatar)) return null;
+      if(s.explorations==null) s.explorations=[false,false,false,false];
+      if(!Array.isArray(s.explorations) || s.explorations.length!==4 ||
+        !s.explorations.every(v=>typeof v==='boolean')) return null;
+      s.usedQuestions=Array.isArray(s.usedQuestions)?
+        [...new Set(s.usedQuestions.filter(id=>QUESTIONS.some(q=>q.id===id && q.grade===s.grade)))]:[];
+      s.lastQuestion=QUESTIONS.some(q=>q.id===s.lastQuestion && q.grade===s.grade)?s.lastQuestion:null;
+      return s;
+    } catch(err) {return null;}
+  }
+  function saveGame() {
+    if(!storageAllowed || !game.started || game.state!==STATES.OVERWORLD || game.player.hp<=0) return;
+    const s={version:4,grade:game.grade,avatar:game.avatar,playerName:game.playerName,savedAt:Date.now(),x:game.player.x,y:game.player.y,hp:game.player.hp,
+      seals:game.seals.slice(),questProgress:game.questProgress.slice(),dictionaries:game.dictionaries,
+      explorations:game.explorations.slice(),usedQuestions:game.usedQuestions.slice(),lastQuestion:game.lastQuestion,
+      stats:game.stats.map(v=>({attempts:v.attempts,correct:v.correct})),battlesWon:game.battlesWon};
+    try {
+      localStorage.setItem(SAVE_KEY,JSON.stringify(s));game.saved=s;
+      setSaveStatus('Salvo automaticamente','saved');
+    }
+    catch(err) {
+      storageAllowed=false;setSaveStatus('Salvamento indisponível','unavailable');
+      notice.textContent='Este navegador não permitiu salvar o progresso. Você pode continuar jogando.';
+    }
+  }
+  function clearInput() {
+    input.held.clear();input.queue.length=0;inputRepeat=0;
+    document.querySelectorAll('[data-input]').forEach(b=>b.classList.remove('held'));
+  }
+  function changeState(next) {
+    game.state=next;dirty=true;input.queue.length=0;inputRepeat=0;
+    announce();
+  }
+  function showDialog(title,str,onClose) {
+    game.overlay={type:'dialog',title,pages:dialogPages(str),page:0,onClose:onClose||null};
+    dirty=true;announce();
+  }
+  function startGame(grade,resume) {
+    clearInput();game.started=true;game.grade=grade;game.time=0;
+    game.avatar=resume?resume.avatar:(avatarSelect.value==='girl'?'girl':'boy');
+    game.playerName=cleanName(resume?resume.playerName:nameInput.value);
+    avatarSelect.value=game.avatar;nameInput.value=game.playerName;
+    viewSettings.avatar=game.avatar;viewSettings.name=game.playerName;storeViewSettings();
+    game.player={x:resume?resume.x:HUB.x,y:resume?resume.y:HUB.y,facing:'down',
+      hp:resume?resume.hp:MAX_HP,displayHP:resume?resume.hp:MAX_HP,step:null};
+    game.seals=resume?resume.seals.slice():[false,false,false,false];
+    game.explorations=resume?resume.explorations.slice():[false,false,false,false];
+    game.questProgress=resume?resume.questProgress.slice():[0,0,0,0];
+    game.dictionaries=resume?resume.dictionaries:3;
+    game.stats=resume?resume.stats.map(v=>({...v})):emptyStats();
+    game.battlesWon=resume?resume.battlesWon:0;
+    game.usedQuestions=resume?resume.usedQuestions.slice():[];
+    game.lastQuestion=resume?resume.lastQuestion:null;game.battle=null;game.overlay=null;
+    game.message=activeMission().goal+' B abre o mapa; J mostra as missões.';
+    gradeSelect.value=String(grade);gradeSelect.disabled=true;
+    changeState(STATES.OVERWORLD);saveGame();applyViewSettings();
+    if(!resume) showDialog('Professora Lina',
+      game.playerName+', o Ruído espalhou as páginas dos livros! Há 12 missões em quatro capítulos. Comece com Nilo no Bosque das Formas, a noroeste. Encontre suas páginas, devolva-as, vença a prova e então desafie o guardião. Cada selo abre o capítulo seguinte; os monstros ficam mais fortes. B abre o mapa e a bolsa mostra as missões. Depois dos quatro selos, volte ao Arquivo Central. Cada explicação ajuda você a aprender.');
+    canvas.focus({preventScroll:true});
+  }
+  function returnToWelcome() {
+    clearInput();game.started=false;game.battle=null;game.player.step=null;
+    gradeSelect.disabled=false;
+    game.saved=readSave();nameInput.value=game.playerName;
+    game.overlay={type:'welcome',selection:game.grade-6};
+    changeState(STATES.OVERWORLD);
+  }
+  function result(title,body,next,correct) {
+    game.battle.result={title,body,pages:dialogPages(body),page:0,next,correct};
+    changeState(STATES.BATTLE_RESULT);
+  }
+  function beginBattle(region,kind) {
+    if(game.battle || game.player.step) return;
+    game.overlay=null;clearInput();
+    // A série escolar calibra o conteúdo; o avanço da campanha calibra o combate.
+    const rank=kind==='wild'?countSeals():region;
+    const max=kind==='final'?210:kind==='guardian'?90+30*rank:kind==='trial'?60+30*rank:60+15*rank;
+    const damage=kind==='final'?30:kind==='guardian'?22+2*rank:kind==='trial'?16+3*rank:16+2*rank;
+    const studyCounter=kind==='final'?14:kind==='guardian'?10+2*rank:kind==='trial'?8+2*rank:8+rank;
+    game.battle={
+      region,kind,name:kind==='final'?'O Ruído':kind==='trial'?CHAPTERS[region].trial:REGIONS[region].monster,
+      level:kind==='final'?5:rank+1,damage,studyCounter,
+      hp:max,maxHP:max,displayHP:max,menu:0,selection:0,question:null,
+      studies:3,aidReady:false,aidActive:false,eliminated:[],intro:0,questionTurn:0,
+      flash:0,flashTarget:null,result:null
+    };
+    tone('encounter');changeState(STATES.BATTLE_INTRO);
+  }
+  function selectQuestion() {
+    const b=game.battle;
+    // O desafio final percorre os quatro eixos antes de repetir um deles.
+    // Guardiões e encontros comuns mantêm o tema da região explorada.
+    const topic=REGIONS[b.kind==='final'?b.questionTurn%REGIONS.length:b.region].topic;
+    const eligible=QUESTIONS.filter(q=>q.grade===game.grade &&
+      q.topic===topic);
+    let pool=eligible.filter(q=>!game.usedQuestions.includes(q.id));
+    if(!pool.length) {
+      game.usedQuestions=game.usedQuestions.filter(id=>!eligible.some(q=>q.id===id));
+      pool=eligible.slice();
+    }
+    if(pool.length>1) pool=pool.filter(q=>q.id!==game.lastQuestion);
+    const q=pool[Math.floor(Math.random()*pool.length)];
+    b.questionTurn++;
+    game.usedQuestions.push(q.id);game.lastQuestion=q.id;
+    const order=[0,1,2,3];
+    for(let i=3;i>0;i--) {
+      const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];
+    }
+    b.question={...q,options:order.map(i=>q.options[i]),answer:order.indexOf(q.answer)};
+    b.selection=0;b.eliminated=[];b.aidActive=b.aidReady;b.aidReady=false;
+    if(b.aidActive) {
+      const wrong=order.map((_,i)=>i).filter(i=>i!==b.question.answer);
+      for(let i=wrong.length-1;i>0;i--) {
+        const j=Math.floor(Math.random()*(i+1));[wrong[i],wrong[j]]=[wrong[j],wrong[i]];
+      }
+      b.eliminated=wrong.slice(0,2);
+      b.selection=[0,1,2,3].find(i=>!b.eliminated.includes(i));
+    }
+    changeState(STATES.BATTLE_QUESTION);
+  }
+  function answerQuestion() {
+    const b=game.battle,q=b.question;
+    if(game.state!==STATES.BATTLE_QUESTION || b.eliminated.includes(b.selection)) return;
+    const correct=b.selection===q.answer;
+    const index=REGIONS.findIndex(r=>r.topic===q.topic);
+    game.stats[index].attempts++;
+    if(correct) {
+      game.stats[index].correct++;b.hp=Math.max(0,b.hp-CRITICAL_DAMAGE);
+      b.flash=0.3;b.flashTarget='enemy';tone('correct');
+    } else {
+      const damage=b.damage;
+      game.player.hp=Math.max(0,game.player.hp-damage);
+      b.flash=0.3;b.flashTarget='player';tone('wrong');
+    }
+    const next=game.player.hp===0?'gameover':b.hp===0?(b.kind==='final'?'victory':'won'):'menu';
+    const damage=b.damage;
+    result(correct?'Acerto crítico! −30 HP':'Vamos revisar. −'+damage+' HP',
+      'Resposta: '+q.options[q.answer]+'.\n'+q.feedback,next,correct);
+  }
+  function chooseBattleMenu() {
+    const b=game.battle;
+    if(b.menu===0) {selectQuestion();return;}
+    if(b.menu===1) {
+      if(b.studies<=0) {result('Estudos usados','Os três estudos desta batalha já foram usados. Analise uma questão ou recue para visitar a bibliotecária.','menu');return;}
+      if(game.player.hp===MAX_HP) {result('HP completo','Você está com todo o HP. Nenhum estudo foi gasto.','menu');return;}
+      b.studies--;
+      const before=game.player.hp;
+      const healed=Math.min(MAX_HP,before+35);
+      const counter=b.studyCounter;
+      game.player.hp=Math.max(0,healed-counter);tone('heal');
+      result('Pausa para estudar',
+        'Você recuperou '+(healed-before)+' HP. O monstro contra-atacou e tirou '+counter+
+        ' HP. Restam '+b.studies+' estudos nesta batalha.',game.player.hp===0?'gameover':'menu');return;
+    }
+    if(b.menu===2) {
+      if(b.aidReady) {result('Dica já preparada','O dicionário já está pronto para a próxima questão. Nenhum item extra foi gasto.','menu');return;}
+      if(game.dictionaries===0) {result('Sem dicionários','Você não tem itens de dicionário. Cada guardião vencido entrega dois novos itens.','menu');return;}
+      game.dictionaries--;b.aidReady=true;tone('select');
+      result('Dicionário preparado','Na próxima questão, duas alternativas incorretas serão eliminadas. Pressione B durante a pergunta para consultar uma dica de raciocínio.','menu');return;
+    }
+    tone('select');
+    result('Você recuou','A fuga foi segura. Nenhum selo ou prêmio foi recebido. Você pode estudar na vila e tentar novamente.','fled');
+  }
+  function finishBattle(won) {
+    const b=game.battle;
+    if(won) {
+      game.battlesWon++;
+      if(b.kind==='guardian') {
+        game.seals[b.region]=true;game.questProgress[b.region]=5;
+        game.dictionaries=Math.min(9,game.dictionaries+2);
+        game.player.hp=Math.min(MAX_HP,game.player.hp+30);
+        game.message='Selo de '+REGIONS[b.region].topic+' conquistado! +30 HP, +2 dicionários.';
+      } else if(b.kind==='trial') {
+        game.questProgress[b.region]=4;
+        game.player.hp=Math.min(MAX_HP,game.player.hp+25);
+        game.dictionaries=Math.min(9,game.dictionaries+1);
+        game.message='Prova concluída! +25 HP, +1 dicionário. '+chapterGoal(b.region);
+      } else {
+        game.player.hp=Math.min(MAX_HP,game.player.hp+10);
+        game.message='Criatura compreendida! +10 HP. Continue até os guardiões.';
+      }
+      tone('win');
+    } else game.message='Você voltou ao mapa. Nara, na vila, recupera seu HP.';
+    game.player.displayHP=game.player.hp;game.battle=null;
+    clearInput();changeState(STATES.OVERWORLD);saveGame();
+    if(won && b.kind==='guardian') showDialog('Um selo recuperado',
+      REGIONS[b.region].topic+' voltou a fazer sentido! Você ganhou dois dicionários e recuperou 30 HP. '+
+      (countSeals()===4?'As 12 missões estão concluídas! Entre no Arquivo Central, ao norte da vila, para enfrentar o Ruído.':'O próximo capítulo está disponível. '+activeMission().goal+' Abra o caderno com B para localizar o objetivo.'));
+    else if(won && b.kind==='trial') showDialog('Prova superada',
+      'Você concluiu a segunda missão deste capítulo! Recuperou 25 HP e ganhou um dicionário. '+chapterGoal(b.region)+' O guardião é mais resistente; visite Nara se precisar recuperar todo o HP.');
+  }
+  function advanceResult() {
+    const r=game.battle.result;
+    if(r.page<r.pages.length-1) {r.page++;dirty=true;announce();return;}
+    if(r.next==='menu') {game.battle.menu=0;changeState(STATES.BATTLE_MENU);}
+    else if(r.next==='won') finishBattle(true);
+    else if(r.next==='fled') finishBattle(false);
+    else if(r.next==='gameover') {clearInput();changeState(STATES.GAME_OVER);}
+    else if(r.next==='victory') {
+      game.battlesWon++;game.player.hp=Math.min(MAX_HP,game.player.hp+30);
+      tone('win');clearInput();changeState(STATES.VICTORY);
+      // O checkpoint da exploração permanece disponível para rever a aventura.
+    }
+  }
+  function interact() {
+    const p=game.player,d=DIRECTIONS[p.facing];
+    const ahead=objectAt(p.x+d.x,p.y+d.y);
+    const o=ahead || objects.find(o=>Math.abs(o.x-p.x)+Math.abs(o.y-p.y)<=1);
+    if(!o) {
+      game.message='Aproxime-se de uma pessoa, placa ou guardião e aperte A.';
+      dirty=true;announce();return;
+    }
+    tone('select');
+    if(o.kind==='teacher') showDialog(o.name,
+      'A campanha tem quatro capítulos, na ordem: Morfologia, Sintaxe, Ortografia e Literatura. Em cada um, converse com o mentor, busque suas páginas e entregue-as; depois vença a prova e o guardião. São 12 missões! Cada selo abre o próximo capítulo. B mostra o mapa e o alvo dourado; na bolsa, toque em Ver missões. Caminhos claros não têm encontros. Na grama alta, cada passo tem 30% de chance de batalha.');
+    else if(o.kind==='healer') {
+      p.hp=MAX_HP;p.displayHP=MAX_HP;tone('heal');saveGame();
+      showDialog(o.name,'Uma boa pausa devolve a atenção. Seu HP foi completamente recuperado! Releia o guia do caderno, converse com sua dupla e continue quando quiser.');
+    } else if(o.kind==='mentor') {
+      const i=o.region,c=CHAPTERS[i],fresh=!game.explorations[i];
+      if(fresh) {game.explorations[i]=true;game.dictionaries=Math.min(9,game.dictionaries+1);}
+      let mission;
+      if(!chapterUnlocked(i)) mission=chapterGoal(i)+' A clareira de estudo continua aberta para você.';
+      else if(game.questProgress[i]===0) {
+        game.questProgress[i]=1;
+        mission='Missão aceita: '+c.titles[0]+'. O Ruído escondeu as '+c.pages+' em um baú '+
+          ['a noroeste','a nordeste','a sudoeste','a sudeste'][i]+' do santuário. Siga a trilha e o alvo dourado no mapa. Traga as páginas de volta para mim.';
+      } else if(game.questProgress[i]===2) {
+        game.questProgress[i]=3;game.player.hp=Math.min(MAX_HP,game.player.hp+12);game.player.displayHP=game.player.hp;
+        game.dictionaries=Math.min(9,game.dictionaries+1);
+        mission='Páginas entregues! Você concluiu uma missão: +12 HP e +1 dicionário. '+chapterGoal(i)+' O mapa agora destaca a clareira da prova.';
+      } else mission=chapterGoal(i);
+      saveGame();game.message=activeMission().goal;
+      showDialog(o.name,LESSONS[i]+(fresh?' Você descobriu uma clareira e ganhou um dicionário! ':' ')+mission);
+    } else if(o.kind==='chest') {
+      const i=o.region;
+      if(!chapterUnlocked(i) || game.questProgress[i]===0) showDialog('Baú de páginas',
+        'Este baú guarda as '+o.name+'. '+chapterGoal(i)+' O mentor precisa pedir a recuperação antes de você levar as páginas.');
+      else if(game.questProgress[i]===1) {
+        game.questProgress[i]=2;saveGame();game.message=activeMission().goal;
+        showDialog('Páginas recuperadas',
+          'Você colocou as '+o.name+' na bolsa. '+chapterGoal(i)+' A missão termina quando as páginas forem entregues.');
+      } else showDialog('Baú já visitado',game.questProgress[i]===2?
+        'As páginas já estão na sua bolsa. '+chapterGoal(i):'Estas páginas já voltaram para o livro. '+chapterGoal(i));
+    } else if(o.kind==='sign') showDialog('Placa da vila',
+      'Capítulo 1: Bosque das Formas, a noroeste. Capítulo 2: Ruínas da Frase, a nordeste. Capítulo 3: Vale da Escrita, a sudoeste. Capítulo 4: Jardim das Histórias, a sudeste. Norte da vila: Arquivo Central. Nara recupera seu HP na casa da praça. B abre o mapa; na bolsa, Ver missões mostra seu progresso.');
+    else if(o.kind==='trial') {
+      const i=o.region;
+      if(!chapterUnlocked(i) || game.questProgress[i]<3) showDialog('Clareira da prova',chapterGoal(i)+' Só após entregar as páginas você poderá enfrentar esta prova.');
+      else if(game.questProgress[i]>=4) showDialog('Prova concluída','Você já compreendeu '+o.name+'. '+chapterGoal(i));
+      else showDialog('Prova de '+REGIONS[i].topic,
+        o.name+' protege o caminho até o guardião. Use as pistas das páginas para analisar as questões. Vença esta prova e receba 25 HP e um dicionário.',
+        ()=>beginBattle(i,'trial'));
+    } else if(o.kind==='guardian') {
+      const i=o.region;
+      if(game.seals[i]) showDialog(o.name,
+        'O selo de '+REGIONS[i].topic+' já é seu. Leve o que aprendeu para os outros desafios. Os encontros na grama continuam disponíveis para praticar.');
+      else if(!chapterUnlocked(i) || game.questProgress[i]<4) showDialog('Guardião '+o.name,
+        chapterGoal(i)+' Complete a busca das páginas e a prova deste capítulo para recuperar meu selo.');
+      else showDialog('Guardião '+o.name,
+        'Você trouxe as páginas de volta e superou a prova de '+REGIONS[i].topic+'. Agora enfrente meu desafio para recuperar o selo. Sou mais resistente que o monstro da prova. Pense e explique sua escolha antes de confirmar.',
+        ()=>beginBattle(i,'guardian'));
+    } else if(o.kind==='archive') {
+      if(countSeals()<4) showDialog('Arquivo Central',
+        'A porta responde aos quatro selos. Você concluiu '+countMissions()+' de 12 missões e reuniu '+countSeals()+' de 4 selos. '+activeMission().goal);
+      else showDialog('O último capítulo',
+        'As 12 missões abriram o Arquivo! O Ruído tem 210 HP e cada erro tira 30 HP. Ele reúne os quatro eixos de Língua Portuguesa. Recupere seu HP e leia com atenção: esta é a batalha final.',
+        ()=>beginBattle(3,'final'));
+    }
+  }
+  function stepPlayer(direction) {
+    const p=game.player;
+    if(p.step) return;
+    p.facing=direction;dirty=true;
+    const d=DIRECTIONS[direction],nx=p.x+d.x,ny=p.y+d.y;
+    if(!walkable(nx,ny)) return;
+    p.step={fromX:p.x,fromY:p.y,toX:nx,toY:ny,t:0,duration:0.16};
+  }
+  function tone(kind) {
+    if(!soundOn) return;
+    try {
+      const Audio=window.AudioContext || window.webkitAudioContext;
+      if(!Audio) return;
+      if(!audioContext) audioContext=new Audio();
+      if(audioContext.state==='suspended') audioContext.resume().catch(()=>{});
+      const sequences={select:[440],correct:[523,659,784],wrong:[220,165],heal:[392,523],
+        encounter:[330,220,330],win:[523,659,784,1047]};
+      const notes=sequences[kind]||sequences.select;
+      notes.forEach((freq,i)=>{
+        const t=audioContext.currentTime+i*0.075;
+        const oscillator=audioContext.createOscillator(),gain=audioContext.createGain();
+        oscillator.type='square';oscillator.frequency.value=freq;
+        gain.gain.setValueAtTime(0.025,t);gain.gain.exponentialRampToValueAtTime(0.001,t+0.09);
+        oscillator.connect(gain);gain.connect(audioContext.destination);
+        oscillator.start(t);oscillator.stop(t+0.1);
+        oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();};
+      });
+    } catch(err) { /* Som opcional nunca bloqueia o jogo. */ }
+  }
+
+  // --------------------------------------------------------------------------
+  // ENTRADAS HÍBRIDAS: fontes independentes evitam perder um toque ao soltar outro.
+  // Enter não se repete ao segurar; direções têm repetição controlada pelo loop.
+  // --------------------------------------------------------------------------
+  const input={held:new Map(),queue:[]};
+  function enqueue(action) { if(input.queue.length<12) input.queue.push(action); }
+  const keys={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',
+    ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',
+    Enter:'A',Space:'A',KeyZ:'A',Escape:'B',KeyX:'B',KeyB:'B'};
+  window.addEventListener('keydown',event=>{
+    if(game.paused || event.ctrlKey || event.metaKey || event.altKey) return;
+    const target=event.target;
+    if(target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) return;
+    if(target && target.tagName==='BUTTON' && !target.hasAttribute('data-input')) return;
+    const shortcuts={KeyF:toggleFullscreen,KeyO:openSettings,KeyH:openHelp,
+      KeyI:openInventory,KeyJ:openMissions,
+      KeyM:()=>updateSound(!soundOn,true)};
+    if(shortcuts[event.code]) {
+      event.preventDefault();if(!event.repeat) shortcuts[event.code]();return;
+    }
+    const action=keys[event.code];
+    if(!action) return;
+    event.preventDefault();
+    if(event.repeat) return;
+    input.held.set('key:'+event.code,action);enqueue(action);
+  });
+  window.addEventListener('keyup',event=>{input.held.delete('key:'+event.code);});
+  window.addEventListener('blur',()=>{saveGame();clearInput();});
+  window.addEventListener('pagehide',saveGame);
+  document.addEventListener('visibilitychange',()=>{
+    saveGame();clearInput();lastTime=0;
+    game.paused=document.hidden || helpDialog.open || settingsDialog.open || inventoryDialog.open;
+    dirty=true;
+  });
+  document.querySelectorAll('[data-input]').forEach(button=>{
+    button.addEventListener('pointerdown',event=>{
+      if(event.pointerType==='mouse' && event.button!==0) return;
+      event.preventDefault();
+      const source='pointer:'+event.pointerId,action=button.dataset.input;
+      try {button.setPointerCapture(event.pointerId);} catch(err) {}
+      input.held.set(source,action);button.classList.add('held');enqueue(action);
+    });
+    function release(event) {
+      input.held.delete('pointer:'+event.pointerId);
+      if(!Array.from(input.held.values()).includes(button.dataset.input)) button.classList.remove('held');
+    }
+    button.addEventListener('pointerup',release);
+    button.addEventListener('pointercancel',release);
+    button.addEventListener('lostpointercapture',release);
+    // Ativação por teclado, leitor de tela ou browser sem evento de ponteiro.
+    button.addEventListener('click',event=>{if(event.detail===0) enqueue(button.dataset.input);});
+    button.addEventListener('contextmenu',event=>event.preventDefault());
+  });
+  canvas.addEventListener('pointerdown',event=>{
+    if(game.paused) return;
+    if(event.pointerType==='mouse' && event.button!==0) return;
+    lastCanvasPointerType=event.pointerType || 'mouse';
+    canvas.focus({preventScroll:true});
+    const box=canvas.getBoundingClientRect();
+    const x=(event.clientX-box.left)*W/box.width,y=(event.clientY-box.top)*H/box.height;
+    const hit=hitAreas.find(h=>x>=h.x && x<h.x+h.w && y>=h.y && y<h.y+h.h);
+    if(hit) {event.preventDefault();enqueue(hit.action);}
+  });
+  canvas.addEventListener('dblclick',event=>{
+    if(game.paused || !viewSettings.doubleClick || lastCanvasPointerType!=='mouse') return;
+    const box=canvas.getBoundingClientRect();
+    const x=(event.clientX-box.left)*W/box.width,y=(event.clientY-box.top)*H/box.height;
+    const hit=hitAreas.find(h=>x>=h.x && x<h.x+h.w && y>=h.y && y<h.y+h.h);
+    if(!hit || typeof hit.action!=='object' ||
+      !['answer','menu'].includes(hit.action.kind)) return;
+    event.preventDefault();enqueue(hit.action);enqueue('A');
+  });
+  gradeSelect.addEventListener('change',()=>{
+    if(game.started) return;
+    game.grade=Number(gradeSelect.value);game.overlay.selection=game.grade-6;dirty=true;announce();
+  });
+  avatarSelect.addEventListener('change',()=>setAvatar(avatarSelect.value));
+  document.getElementById('chooseBoy').addEventListener('click',()=>setAvatar('boy'));
+  document.getElementById('chooseGirl').addEventListener('click',()=>setAvatar('girl'));
+  document.getElementById('startForm').addEventListener('submit',event=>{
+    event.preventDefault();if(game.started) return;
+    startGame(Number(gradeSelect.value),null);
+  });
+  document.getElementById('resumeButton').addEventListener('click',()=>{
+    if(game.saved) startGame(game.saved.grade,game.saved);
+  });
+  document.getElementById('helpButton').addEventListener('click',openHelp);
+  document.getElementById('closeHelp').addEventListener('click',()=>helpDialog.close());
+  helpDialog.addEventListener('close',resumeSimulation);
+  document.getElementById('settingsButton').addEventListener('click',openSettings);
+  document.getElementById('closeSettings').addEventListener('click',()=>settingsDialog.close());
+  settingsDialog.addEventListener('close',()=>{resumeSimulation();scheduleScreenFit();});
+  document.getElementById('inventoryButton').addEventListener('click',openInventory);
+  document.getElementById('closeInventory').addEventListener('click',()=>inventoryDialog.close());
+  inventoryDialog.addEventListener('close',resumeSimulation);
+  document.getElementById('inventoryDictionary').addEventListener('click',()=>useInventoryItem(2));
+  document.getElementById('inventoryStudy').addEventListener('click',()=>useInventoryItem(1));
+  document.getElementById('inventoryJournal').addEventListener('click',()=>{
+    inventoryDialog.close();game.overlay={type:'journal',page:0};dirty=true;announce();
+  });
+  document.getElementById('inventoryMissions').addEventListener('click',()=>{inventoryDialog.close();openMissions();});
+  document.getElementById('saveNow').addEventListener('click',()=>{saveGame();refreshInventory();});
+  rotateFullscreenCheck.addEventListener('change',()=>{viewSettings.rotateFullscreen=rotateFullscreenCheck.checked;storeViewSettings();});
+  displayModeSelect.addEventListener('change',()=>{
+    viewSettings.mode=displayModeSelect.value;storeViewSettings();applyViewSettings();
+  });
+  touchControlsSelect.addEventListener('change',()=>{
+    viewSettings.controls=touchControlsSelect.value;storeViewSettings();applyViewSettings();
+  });
+  doubleClickCheck.addEventListener('change',()=>{
+    viewSettings.doubleClick=doubleClickCheck.checked;storeViewSettings();
+  });
+  settingsSoundCheck.addEventListener('change',()=>updateSound(settingsSoundCheck.checked,true));
+  document.getElementById('fullButton').addEventListener('click',toggleFullscreen);
+  document.getElementById('settingsFullscreen').addEventListener('click',async()=>{
+    settingsDialog.close();await toggleFullscreen();
+  });
+  document.addEventListener('fullscreenchange',syncFullscreenUI);
+  document.addEventListener('webkitfullscreenchange',syncFullscreenUI);
+  document.getElementById('soundButton').addEventListener('click',()=>{
+    updateSound(!soundOn,true);
+    canvas.focus({preventScroll:true});
+  });
+  window.addEventListener('resize',applyViewSettings);
+  window.addEventListener('orientationchange',()=>{applyViewSettings();scheduleScreenFit();});
+  if(window.visualViewport) window.visualViewport.addEventListener('resize',scheduleScreenFit);
+  if(window.ResizeObserver) new window.ResizeObserver(scheduleScreenFit).observe(screenStage);
+  if(window.matchMedia) {
+    const pointer=window.matchMedia('(pointer: coarse)');
+    if(pointer.addEventListener) pointer.addEventListener('change',applyViewSettings);
+  }
+
+  function moveGrid(index,direction,disabled) {
+    // Preserva a orientação 2x2. Se o vizinho foi eliminado, procura o próximo válido.
+    const row=Math.floor(index/2),col=index%2;
+    let next=direction==='left'?row*2:
+      direction==='right'?row*2+1:direction==='up'?col:col+2;
+    if(next===index || (disabled && disabled.includes(next))) {
+      const available=[0,1,2,3].filter(i=>!(disabled||[]).includes(i));
+      const pos=available.indexOf(index),delta=(direction==='left'||direction==='up')?-1:1;
+      next=available[(pos+delta+available.length)%available.length];
+    }
+    return next;
+  }
+  function handleOverlay(action) {
+    const o=game.overlay;
+    if(o.type==='welcome') {
+      if(typeof action==='object' && action.kind==='grade') o.selection=action.index;
+      else if(typeof action==='object' && action.kind==='avatar') {setAvatar(action.value);return;}
+      else if(DIRECTIONS[action]) o.selection=moveGrid(o.selection,action);
+      else if(action==='A') {startGame(o.selection+6,null);return;}
+      else if(action==='B' && game.saved) {startGame(game.saved.grade,game.saved);return;}
+      else if(typeof action==='object' && action.kind==='start') {startGame(o.selection+6,null);return;}
+      else if(typeof action==='object' && action.kind==='resume' && game.saved) {startGame(game.saved.grade,game.saved);return;}
+      game.grade=o.selection+6;gradeSelect.value=String(game.grade);
+    } else if(o.type==='dialog') {
+      if(action!=='A' && action!=='B') return;
+      if(action==='A' || action==='B') {
+        // Nenhum comentário é pulado por Esc: ambos os botões avançam a página.
+        if(o.page<o.pages.length-1) o.page++;
+        else {game.overlay=null;if(o.onClose) o.onClose();}
+      }
+    } else if(o.type==='journal') {
+      if(action!=='B' && action!=='A' && action!=='left' && action!=='right') return;
+      if(action==='B') game.overlay=null;
+      else o.page=(o.page+(action==='left'?3:1))%4;
+    }
+    dirty=true;announce();
+  }
+
+  // 1/3 — Entrada: lê comandos, sem usar coordenadas de tela para física.
+  function handleInput(dt) {
+    if(game.paused) return;
+    inputRepeat=Math.max(0,inputRepeat-dt);
+    let action=input.queue.shift();
+    if(!action && inputRepeat===0) {
+      const held=Array.from(input.held.values()).filter(v=>DIRECTIONS[v]);
+      if(held.length) action=held[held.length-1];
+    }
+    if(!action) return;
+    if(DIRECTIONS[action]) inputRepeat=game.state===STATES.OVERWORLD && !game.overlay?0.05:0.18;
+    if(game.overlay) {handleOverlay(action);return;}
+    const b=game.battle;
+    if(game.state===STATES.OVERWORLD) {
+      if(game.player.step) return;
+      if(DIRECTIONS[action]) stepPlayer(action);
+      else if(action==='A') interact();
+      else if(action==='B') {game.overlay={type:'journal',page:0};dirty=true;announce();}
+    } else if(game.state===STATES.BATTLE_INTRO) {
+      if(action==='A' && b.intro>=0.65) changeState(STATES.BATTLE_MENU);
+    } else if(game.state===STATES.BATTLE_MENU) {
+      if(DIRECTIONS[action]) {b.menu=moveGrid(b.menu,action);tone('select');dirty=true;announce();}
+      else if(action==='A') chooseBattleMenu();
+      else if(action==='B') {b.menu=3;dirty=true;announce();}
+      else if(typeof action==='object' && action.kind==='menu') {b.menu=action.index;dirty=true;announce();}
+    } else if(game.state===STATES.BATTLE_QUESTION) {
+      if(DIRECTIONS[action]) {
+        if(H===640) {
+          const available=[0,1,2,3].filter(i=>!b.eliminated.includes(i));
+          const delta=action==='up' || action==='left'?-1:1;
+          const index=available.indexOf(b.selection);
+          b.selection=available[(index+delta+available.length)%available.length];
+        } else b.selection=moveGrid(b.selection,action,b.eliminated);
+        tone('select');dirty=true;announce();
+      }
+      else if(action==='A') answerQuestion();
+      else if(action==='B') showDialog(b.aidActive?'Dica do dicionário':'Leia sem pressa',
+        b.aidActive?b.question.hint:'Releia o enunciado, observe o contexto e compare as alternativas. Para eliminar duas opções e obter uma dica específica, prepare o DICIONÁRIO antes de uma questão.');
+      else if(typeof action==='object' && action.kind==='answer' && !b.eliminated.includes(action.index)) {
+        b.selection=action.index;dirty=true;announce();
+      }
+    } else if(game.state===STATES.BATTLE_RESULT) {
+      if(action==='A' || action==='B') advanceResult();
+    } else if(game.state===STATES.GAME_OVER || game.state===STATES.VICTORY) {
+      if(action==='A') {startGame(game.grade,null);}
+      else if(action==='B') returnToWelcome();
+    }
+  }
+
+  // 2/3 — Simulação: movimento por tile, encontros e animações com delta em segundos.
+  function update(dt) {
+    if(game.paused) return;
+    game.time+=dt;
+    const frame=Math.floor(game.time*6);
+    if(frame!==lastAnimationFrame) {lastAnimationFrame=frame;dirty=true;}
+    const p=game.player;
+    if(game.state===STATES.OVERWORLD && p.step && !game.overlay) {
+      p.step.t=Math.min(1,p.step.t+dt/p.step.duration);dirty=true;
+      if(p.step.t>=1) {
+        p.x=p.step.toX;p.y=p.step.toY;p.step=null;saveGame();
+        // Uma única rolagem ao completar cada passo em grama alta: chance exata de 30%.
+        if(tileAt(p.x,p.y)===T.HIGH && Math.random()<ENCOUNTER_CHANCE)
+          beginBattle(regionAt(p.x,p.y),'wild');
+      }
+    }
+    if(game.battle) {
+      const b=game.battle;
+      b.intro+=dt;
+      b.flash=Math.max(0,b.flash-dt);
+      const amount=100*dt;
+      const approach=(current,target)=>current<target?Math.min(target,current+amount):Math.max(target,current-amount);
+      if(b.displayHP!==b.hp || p.displayHP!==p.hp || b.flash>0) dirty=true;
+      b.displayHP=approach(b.displayHP,b.hp);p.displayHP=approach(p.displayHP,p.hp);
+    }
+  }
+
+  function renderWelcome() {
+    // A tela inicial usa formulário HTML para abrir o teclado nativo do celular.
+    // O mesmo quadro de arte fica disponível no buffer do jogo.
+    ctx.drawImage(document.getElementById('openingArt'),0,0,960,440,0,0,W,H);
+  }
+  function renderOverworld() {
+    const p=game.player,step=p.step;
+    const fx=step?step.fromX+(step.toX-step.fromX)*step.t:p.x;
+    const fy=step?step.fromY+(step.toY-step.fromY)*step.t:p.y;
+    camera.x=clamp(Math.round(fx*TILE+8-VIEW.w/2),0,worldCache.width-VIEW.w);
+    camera.y=clamp(Math.round(fy*TILE+8-VIEW.h/2),0,worldCache.height-VIEW.h);
+    ctx.drawImage(worldCache,camera.x,camera.y,VIEW.w,VIEW.h,0,VIEW.y,W,VIEW.h*SCALE);
+    ctx.save();ctx.beginPath();ctx.rect(0,VIEW.y,W,VIEW.h*SCALE);ctx.clip();
+    // Objetos e personagem em ordem de profundidade; cenário estático já cacheado.
+    const objective=activeMission().target;
+    const actors=objects.map(o=>({o,y:o.y}));actors.push({player:true,y:fy});
+    actors.sort((a,b)=>a.y-b.y);
+    actors.forEach(actor=>{
+      if(actor.player) {
+        const x=Math.round((fx*TILE-camera.x)*SCALE),y=VIEW.y+Math.round((fy*TILE-camera.y-3)*SCALE);
+        drawPlayer(ctx,x,y,2,p.facing,step && Math.floor(step.t*4)%2===1,false);return;
+      }
+      const o=actor.o,x=(o.x*TILE-camera.x)*SCALE,y=VIEW.y+(o.y*TILE-camera.y)*SCALE;
+      if(x<-70 || y<VIEW.y-70 || x>W+30 || y>VIEW.y+VIEW.h*SCALE+30) return;
+      if(o.kind==='teacher' || o.kind==='healer' || o.kind==='mentor') {
+        drawPlayer(ctx,x,y-8,2,'down',false,true);
+        if(o.kind==='mentor') {
+          drawBook(ctx,x+21,y+6,1,REGIONS[o.region].color);
+          if(!game.explorations[o.region] && o!==objective) text('?',x+12,y-28,22,C.gold);
+        }
+        if(o.kind==='healer') {
+          rect(ctx,x+9,y-20,13,5,C.red);rect(ctx,x+13,y-24,5,13,C.red);
+        }
+      } else if(o.kind==='sign') {
+        rect(ctx,x+13,y+8,6,23,C.trunk);rect(ctx,x+2,y-1,28,17,C.goldDark);
+        rect(ctx,x+5,y+2,22,11,C.paper);rect(ctx,x+9,y+6,14,2,C.trunk);
+      } else if(o.kind==='archive') {
+        rect(ctx,x+2,y-19,28,50,C.ink);drawBook(ctx,x+7,y-10,1,countSeals()===4?C.gold:C.blueDark);
+      } else if(o.kind==='chest') {
+        const opened=game.questProgress[o.region]>=2;
+        rect(ctx,x+2,y+3,28,24,C.goldDark);rect(ctx,x+4,y+6,24,18,C.orangeDark);
+        rect(ctx,x+2,y+3,28,6,C.gold);rect(ctx,x+2,y+15,28,3,C.gold);
+        rect(ctx,x+13,y+13,6,7,C.paper);
+        if(opened) {drawBook(ctx,x+6,y-7,1,REGIONS[o.region].color);text('✓',x+12,y-28,22,C.muted);}
+      } else if(o.kind==='trial') {
+        rect(ctx,x-7,y+15,46,12,REGIONS[o.region].dark);
+        if(game.questProgress[o.region]>=4) {
+          drawBook(ctx,x+1,y-5,2,REGIONS[o.region].color);text('✓',x+9,y-28,26,C.gold);
+        } else drawMonster(ctx,x,y-9,2,o.region,false,false);
+      } else if(o.kind==='guardian') {
+        if(game.seals[o.region]) {
+          drawBook(ctx,x+1,y-5,2,REGIONS[o.region].color);
+          text('✓',x+9,y-28,26,C.gold);
+        } else {
+          drawMonster(ctx,x,y-9,2,o.region,false,true);
+          if(o!==objective) text(chapterUnlocked(o.region)?'?':'·',x+11,y-37,25,C.muted);
+        }
+      }
+      // Losango dourado é o mesmo alvo mostrado no mapa do caderno.
+      if(o===objective) {
+        const markerY=y-43+(reducedMotion?0:Math.floor(game.time*2)%2*2);
+        rect(ctx,x+12,markerY,8,4,C.gold);rect(ctx,x+8,markerY+4,16,4,C.gold);
+        rect(ctx,x+12,markerY+8,8,4,C.gold);
+      }
+    });
+    ctx.restore();
+    panel(0,0,W,64,C.ink);
+    const inVillage=Math.abs(p.x-HUB.x)<7 && Math.abs(p.y-HUB.y)<6;
+    text(inVillage?'Vila do Prólogo':REGIONS[regionAt(p.x,p.y)].name,16,10,22,C.paper);
+    text('HP '+p.hp+'/'+MAX_HP,410,8,17,C.muted);
+    healthBar(409,32,209,p.hp,MAX_HP);
+    const nameLabel=game.playerName+' · '+game.grade+'º';
+    text(nameLabel,16,39,nameFont(nameLabel,245,15,10),C.muted);
+    REGIONS.forEach((r,i)=>{
+      rect(ctx,272+i*31,39,23,15,game.seals[i]?r.color:C.border);
+      text(game.seals[i]?'✓':'·',283+i*31,37,18,C.paper,'center');
+    });
+    const footer=H-96;panel(0,footer,W,96,C.ink);
+    const mission=activeMission();
+    text(mission.title,16,footer+10,nameFont(mission.title,607,18,14),C.gold);
+    const goal=wrap(mission.goal,607,19);
+    goal.slice(0,2).forEach((line,i)=>text(line,16,footer+37+i*23,19,C.paper));
+    if(goal.length===1) text(app.dataset.interface==='mobile'?
+      'B · mapa     Bolsa · missões e itens':'B · mapa     J · missões     I · bolsa',16,footer+66,15,C.muted);
+    hitAreas.push({x:0,y:footer,w:W,h:96,action:'B'});
+  }
+  function renderBattleTop() {
+    const b=game.battle,p=game.player,r=REGIONS[b.region];
+    ctx.drawImage(battleBackgrounds[b.region],0,0);
+    const bob=reducedMotion?0:Math.floor(game.time*3)%2*3;
+    const flicker=b.flash>0 && !reducedMotion && Math.floor(b.flash*24)%2===0;
+    if(!(flicker && b.flashTarget==='enemy')) drawMonster(ctx,453,85+bob,4,b.region,b.kind==='final',b.kind==='guardian');
+    if(!(flicker && b.flashTarget==='player')) drawPlayer(ctx,99,98,4,'up',false,false);
+    panel(298,10,330,73,C.ink,r.color);
+    const enemyLabel=b.name+' · Nv. '+b.level;
+    text(enemyLabel,311,20,nameFont(enemyLabel,302,20,15),C.paper);
+    text('HP '+b.hp+'/'+b.maxHP,311,48,15,C.muted);healthBar(427,47,183,b.displayHP,b.maxHP);
+    panel(12,10,272,73,C.ink,C.teal);
+    text(game.playerName,25,20,nameFont(game.playerName,220,20,12),C.paper);
+    text(game.grade+'º',253,26,12,C.muted);
+    text('HP '+p.hp+'/'+MAX_HP,25,48,15,C.muted);healthBar(145,47,124,p.displayHP,MAX_HP);
+  }
+  function renderBattleIntro() {
+    const b=game.battle;
+    renderBattleTop();panel(12,190,616,H-202);
+    text(b.kind==='final'?'O ÚLTIMO CAPÍTULO':b.kind==='guardian'?'DESAFIO DO GUARDIÃO':b.kind==='trial'?'MISSÃO · PROVA DA CLAREIRA':'ENCONTRO NA GRAMA',28,211,23,C.gold);
+    paragraph(b.kind==='final'?'O Ruído surgiu entre os livros! Os quatro eixos serão necessários para recuperar as histórias.':
+      b.name+' apareceu! Este monstro desafia seus conhecimentos de '+REGIONS[b.region].topic+'.',28,252,577,25,31);
+    text('Erro: −'+b.damage+' HP · Acerto: −30 HP no monstro',28,H-100,19,C.muted);
+    text(b.intro>=0.65?'A / ENTER · COMEÇAR':'Abrindo o livro…',320,H-47,22,C.gold,'center');
+    hitAreas.push({x:12,y:190,w:616,h:H-202,action:'A'});
+    if(b.intro<0.55 && !reducedMotion) {
+      // Faixas discretas, sem flash de tela inteira ou transição estroboscópica.
+      const size=Math.ceil((1-b.intro/0.55)*W/2);
+      rect(ctx,0,0,size,H,C.ink);rect(ctx,W-size,0,size,H,C.ink);
+    }
+  }
+  function renderBattleMenu() {
+    const b=game.battle;
+    renderBattleTop();panel(12,190,616,H-202);
+    text('Qual será sua próxima ideia?',28,208,25,C.paper);
+    text('Escolha com as setas; confirme com A.',28,248,19,C.muted);
+    const labels=['ANALISAR','ESTUDAR','DICIONÁRIO','FUGIR'];
+    const details=['Questão · acerto: −30 HP','+35 HP · '+b.studies+' estudos',
+      b.aidReady?'Dica preparada':game.dictionaries+' itens · eliminar 2 opções','Recuar para o mapa'];
+    labels.forEach((label,i)=>buttonBox(26+(i%2)*300,H-195+Math.floor(i/2)*78,287,69,
+      label,details[i],b.menu===i,{kind:'menu',index:i}));
+    text('B · selecionar FUGIR',320,H-33,17,C.muted,'center');
+  }
+  function renderQuestion() {
+    const b=game.battle,q=b.question,portrait=H===640;
+    renderBattleTop();panel(12,186,616,H-195);
+    const topic=q.topic==='Literatura Brasileira'?'Literatura':q.topic;
+    text(topic+' · '+q.skill,26,198,17,C.gold);
+    let size=portrait?27:25,lines=wrap(q.prompt,578,size);
+    while(lines.length>4 && size>21) {size--;lines=wrap(q.prompt,578,size);}
+    lines.forEach((line,i)=>text(line,26,227+i*(portrait?31:26),size,C.paper));
+    q.options.forEach((option,i)=>{
+      const x=portrait?26:26+(i%2)*300;
+      const y=portrait?354+i*64:338+Math.floor(i/2)*59;
+      const width=portrait?588:287,height=portrait?60:55,font=portrait?25:22;
+      const disabled=b.eliminated.includes(i);
+      panel(x,y,width,height,b.selection===i?C.border:C.ink,b.selection===i?C.gold:C.border);
+      const optionLines=wrap(disabled?'— eliminada —':String.fromCharCode(65+i)+') '+option,width-25,font);
+      optionLines.forEach((line,j)=>text(line,x+11,y+6+j*(portrait?26:23),font,disabled?C.muted:C.paper));
+      if(!disabled) hitAreas.push({x,y,w:width,h:height,action:{kind:'answer',index:i}});
+    });
+    text(b.aidActive?'B · DICA DO DICIONÁRIO':'A · confirmar     B · orientação',320,portrait?H-30:H-22,14,b.aidActive?C.gold:C.muted,'center');
+  }
+  function renderResult() {
+    const r=game.battle.result;
+    renderBattleTop();panel(12,186,616,H-195);
+    text(r.title,27,205,24,r.correct===false?C.red:C.gold);
+    r.pages[r.page].forEach((line,i)=>text(line,27,254+i*30,24,C.paper));
+    text('A · '+(r.page<r.pages.length-1?'LER MAIS':'CONTINUAR'),320,H-44,22,C.gold,'center');
+    hitAreas.push({x:12,y:186,w:616,h:H-195,action:'A'});
+  }
+  function renderDialog() {
+    const o=game.overlay,y=H-248;
+    rect(ctx,21,y+7,598,228,C.dark);panel(15,y,610,236);
+    text(o.title,34,y+21,23,C.gold);
+    o.pages[o.page].forEach((line,i)=>text(line,34,y+59+i*28,24,C.paper));
+    text('A · '+(o.page<o.pages.length-1?'LER MAIS':'CONTINUAR')+
+      (o.pages.length>1?'  '+(o.page+1)+'/'+o.pages.length:''),601,H-40,16,C.muted,'right');
+    hitAreas.push({x:15,y,w:610,h:236,action:'A'});
+  }
+  function renderJournal() {
+    const o=game.overlay;
+    rect(ctx,0,0,W,H,C.dark);panel(12,12,616,H-24);
+    const tabs=['MAPA E MISSÃO','GUIA DE ESTUDO','SUAS DESCOBERTAS','MISSÕES · '+countMissions()+'/12'];
+    text(tabs[o.page],28,30,25,C.gold);
+    text('← / → · trocar página       B · voltar',28,66,18,C.muted);
+    if(o.page===0) {
+      const mapW=H===640?300:240,mapH=mapW*WORLD_H/WORLD_W;
+      ctx.drawImage(worldCache,0,0,worldCache.width,worldCache.height,34,114,mapW,mapH);
+      REGIONS.forEach((r,i)=>{
+        const x=34+r.x/WORLD_W*mapW,y=114+r.y/WORLD_H*mapH;
+        rect(ctx,x-4,y-4,9,9,game.seals[i]?C.gold:r.color);
+      });
+      mentors.forEach(o=>{
+        const x=34+o.x/WORLD_W*mapW,y=114+o.y/WORLD_H*mapH;
+        const color=game.explorations[o.region]?C.gold:C.paper;
+        rect(ctx,x-3,y-1,7,3,color);rect(ctx,x-1,y-3,3,7,color);
+      });
+      const target=activeMission().target;
+      if(target) {
+        const x=34+target.x/WORLD_W*mapW,y=114+target.y/WORLD_H*mapH;
+        rect(ctx,x-2,y-6,4,2,C.gold);rect(ctx,x-4,y-4,8,2,C.gold);
+        rect(ctx,x-6,y-2,12,4,C.gold);rect(ctx,x-4,y+2,8,2,C.gold);rect(ctx,x-2,y+4,4,2,C.gold);
+      }
+      rect(ctx,34+game.player.x/WORLD_W*mapW-3,114+game.player.y/WORLD_H*mapH-3,7,7,C.white);
+      text('■ você   ■ guardiões',34,114+mapH+12,16,C.muted);
+      text('+ estudo   ◆ missão atual',34,114+mapH+35,16,C.muted);
+      REGIONS.forEach((r,i)=>{
+        const x=H===640?354:294,y=117+i*(H===640?66:58);
+        text((game.seals[i]?'✓ ':'· ')+r.topic.replace(' Brasileira',''),x,y,21,r.color);
+        text(['Noroeste','Nordeste','Sudoeste','Sudeste'][i],x+25,y+28,16,C.muted);
+      });
+      paragraph(activeMission().goal,32,H===640?442:370,572,23,28);
+      text('12 missões · 4 capítulos · alvo dourado no mapa',32,H-47,17,C.muted);
+    } else if(o.page===1) {
+      const guides=[
+        ['MORFOLOGIA','Veja a função da palavra no contexto: nome, característica, ação ou ligação.'],
+        ['SINTAXE','Localize verbo, sujeito e complementos. Veja como as orações se conectam.'],
+        ['ORTOGRAFIA','Compare som, escrita e sentido. “Mas” opõe ideias; “mais” acrescenta quantidade.'],
+        ['LITERATURA','Investigue quem narra, o gênero, as imagens e os valores sugeridos pelo texto.']
+      ];
+      guides.forEach((v,i)=>{
+        text(v[0],30,113+i*(H===640?112:80),19,REGIONS[i].color);
+        paragraph(v[1],30,141+i*(H===640?112:80),573,21,24);
+      });
+    } else if(o.page===2) {
+      let total=0,correct=0;
+      game.stats.forEach((s,i)=>{
+        total+=s.attempts;correct+=s.correct;
+        text(REGIONS[i].topic.replace(' Brasileira',''),30,119+i*(H===640?84:59),21,REGIONS[i].color);
+        text(s.correct+' acertos / '+s.attempts+' tentativas',30,146+i*(H===640?84:59),18,C.muted);
+      });
+      text('Selos '+countSeals()+'/4 · Clareiras '+game.explorations.filter(Boolean).length+'/4',30,H-104,21,C.gold);
+      text(total?Math.round(correct/total*100)+'% de acertos nas tentativas':'Sua primeira descoberta ainda está por vir.',30,H-69,19,C.paper);
+    } else if(o.page===3) {
+      const portrait=H===640,height=portrait?105:76;
+      REGIONS.forEach((r,i)=>{
+        const y=108+i*(height+5),q=game.questProgress[i],open=chapterUnlocked(i);
+        panel(24,y,592,height,C.ink,open?r.color:C.border);
+        const title=(i+1)+' · '+r.name;
+        text(title,36,y+7,nameFont(title,438,portrait?24:20,17),open?r.color:C.muted);
+        text(completedInChapter(i)+'/3',600,y+9,portrait?21:18,C.gold,'right');
+        text('Páginas '+(q>=3?'✓':'·')+'   Prova '+(q>=4?'✓':'·')+'   Selo '+(game.seals[i]?'✓':'·'),36,y+31,portrait?21:17,C.muted);
+        paragraph(chapterGoal(i),36,y+53,566,portrait?22:16,portrait?24:20);
+      });
+      text('Capítulos 1 → 4: mais HP e dano. Final: 210 HP.',30,H-34,17,C.gold);
+    }
+    hitAreas.push({x:12,y:12,w:616,h:80,action:'right'});
+  }
+  function renderEnding() {
+    const won=game.state===STATES.VICTORY;
+    rect(ctx,0,0,W,H,C.ink);
+    drawBook(ctx,275,35,5,won?C.gold:C.teal);
+    text(won?'AS HISTÓRIAS VOLTARAM!':'HORA DE RECOMEÇAR',320,131,30,won?C.gold:C.paper,'center');
+    paragraph(won?'Você reuniu os quatro selos e compreendeu o Ruído. As palavras voltaram a conectar as pessoas de Léxico.':
+      'Seu HP chegou a zero. Uma dificuldade mostra o que merece ser revisto. Estude as explicações e tente outra vez.',36,185,572,24,30);
+    let total=0,correct=0;
+    game.stats.forEach(s=>{total+=s.attempts;correct+=s.correct;});
+    text(countSeals()+'/4 selos · '+correct+'/'+total+' respostas corretas',320,H-182,21,C.muted,'center');
+    buttonBox(74,H-135,492,52,'A / ENTER · REINICIAR '+game.grade+'º ANO',null,true,'A');
+    buttonBox(74,H-70,492,45,'B / ESC · VOLTAR À ABERTURA',null,false,'B');
+  }
+
+  // 3/3 — Renderização: só apresenta frames marcados; fundos já prontos em Canvas.
+  // O buffer completo é copiado numa operação, evitando apresentação parcial.
+  function render() {
+    if(!dirty) return;
+    dirty=false;hitAreas=[];
+    rect(ctx,0,0,W,H,C.ink);
+    if(game.overlay && game.overlay.type==='welcome') renderWelcome();
+    else if(game.state===STATES.OVERWORLD) renderOverworld();
+    else if(game.state===STATES.BATTLE_INTRO) renderBattleIntro();
+    else if(game.state===STATES.BATTLE_MENU) renderBattleMenu();
+    else if(game.state===STATES.BATTLE_QUESTION) renderQuestion();
+    else if(game.state===STATES.BATTLE_RESULT) renderResult();
+    else renderEnding();
+    if(game.overlay && game.overlay.type==='dialog') renderDialog();
+    else if(game.overlay && game.overlay.type==='journal') renderJournal();
+    screen.drawImage(buffer,0,0);
+  }
+
+  // Espelho textual e botões nativos para navegação assistiva. Não publica gabaritos.
+  function announce() {
+    const o=game.overlay,b=game.battle;
+    syncGameUI();
+    let message='',items=[];
+    if(o && o.type==='welcome') {
+      message='Léxico. Nome: '+game.playerName+'. Personagem: '+(game.avatar==='girl'?'menina':'menino')+'. Ano selecionado: '+(o.selection+6)+'. A inicia uma nova aventura.'+
+        (game.saved?' B continua a aventura salva.':'');
+      items=[{label:'Iniciar nova aventura',action:{kind:'start'}}];
+      if(game.saved) items.push({label:'Continuar aventura salva',action:{kind:'resume'}});
+    } else if(o && o.type==='dialog') {
+      message=o.title+'. '+o.pages[o.page].join(' ');
+      items=[{label:'Continuar leitura',action:'A'}];
+    } else if(o && o.type==='journal') {
+      message=['Mapa: guardiões de Morfologia a noroeste; Sintaxe a nordeste; Ortografia a sudoeste; Literatura a sudeste.',
+        'Guia: investigue palavras, estrutura das frases, ortografia e sentidos literários.',
+        game.stats.map((s,i)=>REGIONS[i].topic+': '+s.correct+' acertos em '+s.attempts+' tentativas.').join(' '),
+        countMissions()+' de 12 missões concluídas. '+REGIONS.map((r,i)=>r.name+': '+chapterGoal(i)).join(' ')][o.page];
+      items=[{label:'Página anterior',action:'left'},{label:'Próxima página',action:'right'},{label:'Fechar caderno',action:'B'}];
+    } else if(game.state===STATES.OVERWORLD) message=activeMission().goal+' '+game.message+' HP '+game.player.hp+'. Missões '+countMissions()+' de 12. Selos '+countSeals()+' de quatro.';
+    else if(game.state===STATES.BATTLE_INTRO) {
+      message=b.name+' apareceu. HP do inimigo '+b.hp+'. Seu HP '+game.player.hp+'. A inicia a batalha.';
+      items=[{label:'Começar batalha',action:'A'}];
+    } else if(game.state===STATES.BATTLE_MENU) {
+      message='Menu da batalha. Selecionado: '+['Analisar','Estudar','Dicionário','Fugir'][b.menu]+'.';
+      items=['Analisar','Estudar','Dicionário','Fugir'].map((label,i)=>({label,action:{kind:'menu',index:i}}));
+      items.push({label:'Confirmar ação selecionada',action:'A'});
+    } else if(game.state===STATES.BATTLE_QUESTION) {
+      message=b.question.prompt+' Selecionado: '+b.question.options[b.selection]+'.';
+      items=b.question.options.map((label,i)=>({label,action:{kind:'answer',index:i}}))
+        .filter((_,i)=>!b.eliminated.includes(i));
+      items.push({label:'Confirmar resposta selecionada',action:'A'});
+    } else if(game.state===STATES.BATTLE_RESULT) {
+      message=b.result.title+'. '+b.result.pages[b.result.page].join(' ');
+      items=[{label:'Continuar depois do comentário',action:'A'}];
+    } else {
+      message=game.state===STATES.VICTORY?'Você venceu! As histórias voltaram.':'Seu HP chegou a zero. Você pode reiniciar.';
+      items=[{label:'Reiniciar aventura',action:'A'},{label:'Voltar à abertura',action:'B'}];
+    }
+    live.textContent=message;
+    choicesDOM.replaceChildren();
+    items.forEach(item=>{
+      const button=document.createElement('button');button.type='button';button.textContent=item.label;
+      button.addEventListener('click',()=>enqueue(item.action));choicesDOM.appendChild(button);
+    });
+  }
+
+  function frame(now) {
+    const dt=lastTime?clamp((now-lastTime)/1000,0,0.05):0;
+    lastTime=now;
+    handleInput(dt);
+    update(dt);
+    render();
+    window.requestAnimationFrame(frame);
+  }
+  game.saved=readSave();
+  if(game.saved) {game.grade=game.saved.grade;game.avatar=game.saved.avatar;gradeSelect.value=String(game.grade);}
+  game.overlay={type:'welcome',selection:game.grade-6};
+  try {
+    const savedView=JSON.parse(localStorage.getItem(VIEW_SETTINGS_KEY)||'null');
+    if(savedView) {
+      if(['auto','desktop','mobile'].includes(savedView.mode)) viewSettings.mode=savedView.mode;
+      if(['auto','show','hide'].includes(savedView.controls)) viewSettings.controls=savedView.controls;
+      if(typeof savedView.doubleClick==='boolean') viewSettings.doubleClick=savedView.doubleClick;
+      if(typeof savedView.sound==='boolean') viewSettings.sound=savedView.sound;
+      if(['boy','girl'].includes(savedView.avatar)) viewSettings.avatar=savedView.avatar;
+      if(typeof savedView.name==='string') viewSettings.name=cleanName(savedView.name);
+      if(typeof savedView.rotateFullscreen==='boolean') viewSettings.rotateFullscreen=savedView.rotateFullscreen;
+    }
+  } catch(err) { /* Ignora preferências corrompidas ou armazenamento indisponível. */ }
+  game.avatar=game.saved?game.saved.avatar:viewSettings.avatar;
+  avatarSelect.value=game.avatar;
+  game.playerName=game.saved?game.saved.playerName:cleanName(viewSettings.name);
+  nameInput.value=game.playerName==='Aprendiz'?'':game.playerName;
+  updateSound(viewSettings.sound,false);applyViewSettings();
+  if(!storageAllowed) {
+    notice.textContent='Progresso automático indisponível neste navegador; o jogo continua normalmente.';
+    setSaveStatus('Salvamento indisponível','unavailable');
+  } else if(game.saved) setSaveStatus('Progresso salvo disponível','saved');
+  drawOpeningArt();drawInterfaceIcons();
+  announce();render();
+  window.requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
