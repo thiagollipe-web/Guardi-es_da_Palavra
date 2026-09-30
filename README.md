@@ -1,6 +1,6 @@
 <p align="center"><img src="logo.png" alt="Léxico — Guardiões da Palavra" width="340"></p>
 
-# Léxico — Guardiões da Palavra
+# Léxico — Guardiões da Palavra (Criado por Thiago Fillipe Soares)
 
 RPG 2D de Língua Portuguesa para o 6º ao 9º ano, com exploração por tiles,
 128 questões comentadas, um mapa de **112 × 88 tiles**, **12 missões em quatro
