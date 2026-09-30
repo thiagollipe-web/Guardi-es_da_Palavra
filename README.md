@@ -77,6 +77,14 @@ A entrega de páginas recupera 12 HP e dá um dicionário. A prova recupera 25 H
 e dá um dicionário; o guardião recupera 30 HP e dá dois. Prêmios são recebidos
 uma única vez. Nara, na vila, recupera todo o HP gratuitamente.
 
+## Classificação online
+
+O botão **Classificação** mostra os 50 melhores resultados e permite filtrar por ano. O envio usa o Supabase diretamente do navegador e funciona com fila offline: resultados feitos sem internet são sincronizados quando a conexão voltar.
+
+A ativação exige um projeto Supabase. Execute `supabase-ranking.sql` e depois preencha `ranking-config.js` com a URL e a chave publicável/anon do projeto. Não use uma chave `service_role` no navegador.
+
+Para uso com alunos, utilize apelidos ou primeiros nomes e evite dados pessoais. O sistema valida limites básicos no banco, mas a pontuação é calculada no cliente e não foi projetada como anti-fraude de competição oficial.
+
 ## Arquivos
 
 - `index.html`: jogo completo, em um único arquivo.
