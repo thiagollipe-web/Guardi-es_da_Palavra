@@ -1,4 +1,4 @@
-const CACHE_NAME = "lexico-pwa-v2";
+const CACHE_NAME = "lexico-pwa-v3";
 
 const ARQUIVOS = [
   "./",
@@ -6,7 +6,8 @@ const ARQUIVOS = [
   "./logo.png",
   "./icon-192.png",
   "./icon-512.png",
-  "./manifest.webmanifest"
+  "./manifest.webmanifest",
+  "./ranking-config.js"
 ];
 
 self.addEventListener("install", evento => {
